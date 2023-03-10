@@ -4,7 +4,7 @@ namespace App\Lib;
 
 final class User
 {
-  private $id, $email, $password, $created_at, $logged_in;
+  private $id, $email, $password, $logged_in;
 
   //$password = password_hash($password, PASSWORD_DEFAULT);
 
@@ -12,13 +12,11 @@ final class User
     int $id, 
     string $email, 
     string $password, 
-    string $created_at, 
     string $logged_in
   ) {   
     $this->id= $id;
     $this->email= $email;
     $this->password= $password;
-    $this->created_at= $created_at;
     $this->logged_in= $logged_in;
   }
 
@@ -32,10 +30,6 @@ final class User
 
   public function getPassword() {
     return $this->password;
-  }
-
-  public function getCreatedAt() {
-    return $this->created_at;
   }
 
   public function getLoggedIn() {

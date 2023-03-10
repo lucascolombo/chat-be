@@ -15,11 +15,11 @@ final class UserRepository
 
   public function getUserByEmail($email): User {
     $pdo = $this->container->get('db');
-    $stmt = $pdo->prepare("SELECT * FROM user WHERE email=?");
+    $stmt = $pdo->prepare("SELECT * FROM employee_details WHERE employee_mail=?");
     $stmt->execute([$email]);
     $fetch = $stmt->fetch();
 
-    if ($fetch) return new User($fetch["id"], $fetch["email"], $fetch["password"], $fetch["created_at"], $fetch["logged_in"]);
+    if ($fetch) return new User($fetch["employee_id"], $fetch["employee_mail"], $fetch["employee_password"], $fetch["logged_in"]);
 
     return null;
   }
@@ -28,9 +28,8 @@ final class UserRepository
     $id = $user->getId();
     $logged_in = $issuedAt->getTimestamp();
     $pdo = $this->container->get('db');
-    $stmt = $pdo->prepare("UPDATE user SET logged_in = ? WHERE id = ?");
-    $stmt->execute([$logged_in, $id]); 
+    $stmt = $pdo->prepare("UPDATE employee_details SET logged_in = ? WHERE employee_id = ?");
     
-    return $stmt->fetch();
+    return $stmt->execute([$logged_in, $id]); 
   }
 }

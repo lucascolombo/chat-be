@@ -14,15 +14,18 @@ return static function (App $app): void {
     $app->add(function (Request $request, $handler): Response {
         $response = $handler->handle($request);
 
-        return $response
-            ->withHeader('Access-Control-Allow-Origin', '*')
-            ->withHeader(
+        $response = $response->withHeader('Access-Control-Allow-Origin', '*');
+        $response = $response->withHeader('Access-Control-Allow-Credentials', 'true');
+        $response = $response->withHeader(
                 'Access-Control-Allow-Headers',
                 'X-Requested-With, Content-Type, Accept, Origin, Authorization'
-            )
-            ->withHeader(
+        );
+        $response = $response->withHeader(
                 'Access-Control-Allow-Methods',
                 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
-            );
+        );
+        $response = $response->withHeader('Content-Type', 'application/json');
+
+        return $response;
     });
 };

@@ -17,6 +17,13 @@ final class Home
         $this->container = $container;
     }
 
+    public function home(Request $request, Response $response): Response
+    {
+        $message = [ 'success' => true ];
+
+        return $response->withJson($message);
+    }
+
     public function doLogin(Request $request, Response $response): Response
     {
         $message = [ 'success' => false ];

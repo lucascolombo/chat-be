@@ -6,9 +6,8 @@ use App\CustomResponse as Response;
 use Pimple\Psr11\Container;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use App\Repository\ChatRepository;
-use Slim\Routing\RouteContext;
 
-final class Messages
+final class Chat
 {
     private Container $container;
 
@@ -17,16 +16,12 @@ final class Messages
         $this->container = $container;
     }
 
-    public function getMessages(Request $request, Response $response, array $args): Response
+    public function getChats(Request $request, Response $response): Response
     {
         $message = [ 'success' => false ];
 
-        $routeContext = RouteContext::fromRequest($request);                                                                                                             
-        $route = $routeContext->getRoute();
-        $id = $route->getArgument('id');
-
         $chatRepository = new ChatRepository($this->container);
 
-        return $response->withJson($chatRepository->getAllMessages($id));
+        return $response->withJson($chatRepository->getChats());
     }
 }
