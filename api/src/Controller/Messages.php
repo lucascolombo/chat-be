@@ -24,9 +24,11 @@ final class Messages
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
         $id = $route->getArgument('id');
+        $params = $request->getQueryParams();
+        $limit = isset($params["limit"]) ? $params["limit"] : 50;
 
         $chatRepository = new ChatRepository($this->container);
 
-        return $response->withJson($chatRepository->getAllMessages($id));
+        return $response->withJson($chatRepository->getAllMessages($id, $limit));
     }
 }

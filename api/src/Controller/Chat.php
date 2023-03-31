@@ -20,8 +20,11 @@ final class Chat
     {
         $message = [ 'success' => false ];
 
+        $params = $request->getQueryParams();
+        $limit = isset($params["limit"]) ? $params["limit"] : 10;
+
         $chatRepository = new ChatRepository($this->container);
 
-        return $response->withJson($chatRepository->getChats());
+        return $response->withJson($chatRepository->getChats($limit));
     }
 }

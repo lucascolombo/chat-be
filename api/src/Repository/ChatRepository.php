@@ -13,7 +13,7 @@ final class ChatRepository
       $this->container= $container;
   }
 
-  public function getChats() {
+  public function getChats($limit = 10) {
     $message = [ 'success' => false ];
 
     $pdo = $this->container->get('db');
@@ -28,6 +28,7 @@ final class ChatRepository
       FROM clients_chats_opened cco
       INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
       WHERE cco.chat_date_close <= 0
+      LIMIT {$limit}
     ");
     $fetch = $stmt->fetchAll();
     $arr = [];
@@ -43,7 +44,7 @@ final class ChatRepository
     return $message;
   }
 
-  public function getAllMessages($id) {
+  public function getAllMessages($id, $limit = 50) {
     $message = [ 'success' => false ];
 
     $pdo = $this->container->get('db');
@@ -62,6 +63,7 @@ final class ChatRepository
       LEFT JOIN employee_details ed ON ed.employee_id = cm.who_sent
       WHERE cm.chat_id = '$id'
       ORDER BY cm.message_created ASC
+      LIMIT {$limit}
     ");
     $fetch = $stmt->fetchAll();
 
