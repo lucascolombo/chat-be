@@ -13,11 +13,17 @@ final class ChatRepository
       $this->container= $container;
   }
 
-  public function getChats($limit = 10) {
+  public function getChats($limit = 10, $search = '', $nao_lido = false, $setor = '', $status = '', $tag = '', $user = '') {
     $message = [ 'success' => false ];
 
     $pdo = $this->container->get('db');
     //AND cco.company_id = X AND cco.chat_departament_id = Y
+
+    $search_query = "";
+    if ($search !== "") {
+      $search_query = " AND (cco.client_phone LIKE '%$search%' OR crd.client_name LIKE '%$search%') ";
+    }
+
     $stmt = $pdo->query("
       SELECT 
         cco.chat_id as id,
@@ -28,6 +34,7 @@ final class ChatRepository
       FROM clients_chats_opened cco
       INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
       WHERE cco.chat_date_close <= 0
+      {$search_query}
       LIMIT {$limit}
     ");
     $fetch = $stmt->fetchAll();

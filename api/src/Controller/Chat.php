@@ -22,9 +22,15 @@ final class Chat
 
         $params = $request->getQueryParams();
         $limit = isset($params["limit"]) ? $params["limit"] : 10;
+        $search = isset($params["search"]) ? $params["search"] : '';
+        $nao_lido = isset($params["nao_lido"]) ? $params["nao_lido"] === "true" || $params["nao_lido"] === true  : false;
+        $setor = isset($params["setor"]) ? $params["setor"] : '';
+        $status = isset($params["status"]) ? $params["status"] : '';
+        $tag = isset($params["tag"]) ? $params["tag"] : '';
+        $user = isset($params["user"]) ? $params["user"] : '';
 
         $chatRepository = new ChatRepository($this->container);
 
-        return $response->withJson($chatRepository->getChats($limit));
+        return $response->withJson($chatRepository->getChats($limit, $search, $nao_lido, $setor, $status, $tag, $user));
     }
 }
