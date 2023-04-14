@@ -28,6 +28,7 @@ final class ChatRepository
       SELECT 
         cco.chat_id as id,
         IF(crd.client_name = '', cco.client_phone, crd.client_name) as exhibition_name,
+        cco.client_phone,
         crd.client_avatar as avatar,
         cco.chat_last_message_add as last_time,
         (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
