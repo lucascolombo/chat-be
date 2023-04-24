@@ -66,7 +66,8 @@ final class ChatRepository
         ed.employee_name,
         cm.message_created,
         cm.message_status_time,
-        cm.message_status
+        cm.message_status,
+        cm.message_type
       FROM clients_messages cm
       LEFT JOIN employee_details ed ON ed.employee_id = cm.who_sent
       WHERE cm.chat_id = '$id'
