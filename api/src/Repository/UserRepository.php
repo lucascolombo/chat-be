@@ -13,7 +13,7 @@ final class UserRepository
       $this->container= $container;
   }
 
-  public function getUserByEmail($email): User {
+  public function getUserByEmail(string $email): User {
     $pdo = $this->container->get('db');
     $stmt = $pdo->prepare("SELECT * FROM employee_details WHERE employee_mail=?");
     $stmt->execute([$email]);

@@ -58,6 +58,7 @@ $app->post('/', 'App\Controller\Home:home')->setName('home');
 $app->post('/auth', 'App\Controller\Home:doLogin')->setName('login');
 $app->get('/chats', 'App\Controller\Chat:getChats')->add(Auth::class)->setName('chats');
 $app->get('/messages/{id}', 'App\Controller\Messages:getMessages')->add(Auth::class)->setName('messages');
+$app->post('/client/{id}', 'App\Controller\Client:updateDisplayName')->add(Auth::class)->setName('updateDisplayName');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

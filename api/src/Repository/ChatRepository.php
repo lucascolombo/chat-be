@@ -27,6 +27,7 @@ final class ChatRepository
     $stmt = $pdo->query("
       SELECT 
         cco.chat_id as id,
+        cco.client_id,
         IF(crd.client_name = '', cco.client_phone, crd.client_name) as exhibition_name,
         cco.client_phone,
         crd.client_avatar as avatar,
