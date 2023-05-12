@@ -13,15 +13,53 @@ final class ChatRepository
       $this->container= $container;
   }
 
-  public function getChats($limit = 10, $search = '', $nao_lido = false, $setor = '', $status = '', $tag = '', $user = '') {
+  public function getChats($company = null, $limit = 10, $search = '', $nao_lido = false, $setor = '', $status = '', $tag = '', $user = '', $userId) {
     $message = [ 'success' => false ];
 
+    if ($company === null) return $message;
+
     $pdo = $this->container->get('db');
-    //AND cco.company_id = X AND cco.chat_departament_id = Y
 
     $search_query = "";
     if ($search !== "") {
       $search_query = " AND (cco.client_phone LIKE '%$search%' OR crd.client_name LIKE '%$search%') ";
+    }
+
+    $tag_query = "";
+    if ($tag !== "") {
+      $tag_query = " INNER JOIN client_tags_selected cts ON cts.chat_id = cco.chat_id AND cts.tag_id IN ($tag)";
+    }
+
+    $setor_query = "";
+    if ($setor !== "") {
+      $setor_query = " AND cco.chat_department_id IN ($setor) ";
+    }
+
+    $status_query = "";
+    if ($status !== "") {
+      if ($status == 2) {
+        $status_query = " AND cco.chat_department_id = '0' AND cco.employee_id = '0' AND cco.chat_date_close = '0' ";
+      }
+      else if ($status == 3) {
+        $status_query = " AND cco.chat_department_id > '0' AND cco.employee_id = '0' AND cco.chat_date_close = '0' ";
+      }
+      else if ($status == 1) {
+        $status_query = " AND cco.employee_id > '0' AND cco.chat_date_close = '0' ";
+      }
+      
+      if ($status == 4) {
+        $status_query = " AND cco.chat_date_close > '0' AND cco.chat_date_close > ( SELECT chat_date_start FROM clients_chats_opened where client_id = cco.client_id ORDER BY chat_date_start DESC LIMIT 1 )";
+      }
+    }
+
+    $user_query = "";
+    if ($user !== "") {
+      $user_query = " AND cco.chat_employee_id IN ($user) ";
+    }
+
+    $nao_lido_query = "";
+    if ($nao_lido) {
+      $nao_lido_query = " AND cco.chat_last_message_add > cco.chat_employee_last_seen AND chat_last_message_who = 'C' ";
     }
 
     $stmt = $pdo->query("
@@ -35,8 +73,21 @@ final class ChatRepository
         (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
       FROM clients_chats_opened cco
       INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+      {$tag_query}
       WHERE cco.chat_date_close <= 0
       {$search_query}
+      {$setor_query}
+      {$status_query}
+      {$user_query}
+      {$nao_lido_query}
+      AND cco.company_id = '$company'
+      AND cco.company_id IN (
+        SELECT invitations_company_id
+        FROM company_invitations 
+        WHERE invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      )
       LIMIT {$limit}
     ");
     $fetch = $stmt->fetchAll();
@@ -48,16 +99,16 @@ final class ChatRepository
       $arr[] = $element;
     }
 
-    $message = [ 'success' => true, 'chats' => $arr ];
+    $message = [ 'success' => true, 'chats' => $arr, 'company'=> $company ];
 
     return $message;
   }
 
-  public function getAllMessages($id, $limit = 50) {
+  public function getAllMessages($id, $limit = 50, $userId, $companyId) {
     $message = [ 'success' => false ];
 
     $pdo = $this->container->get('db');
-    //AND cco.company_id = X AND cco.chat_departament_id = Y
+
     $stmt = $pdo->query("
       SELECT 
         cm.message_id_external,
@@ -72,6 +123,14 @@ final class ChatRepository
       FROM clients_messages cm
       LEFT JOIN employee_details ed ON ed.employee_id = cm.who_sent
       WHERE cm.chat_id = '$id'
+      AND cm.company_id = '$companyId'
+      AND cm.company_id IN (
+        SELECT invitations_company_id
+        FROM company_invitations 
+        WHERE invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      )
       ORDER BY cm.message_created ASC
       LIMIT {$limit}
     ");

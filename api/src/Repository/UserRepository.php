@@ -4,6 +4,8 @@ namespace App\Repository;
 
 use Pimple\Psr11\Container;
 use App\Lib\User;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 final class UserRepository
 {
@@ -32,4 +34,37 @@ final class UserRepository
     
     return $stmt->execute([$logged_in, $id]); 
   }
+
+  public function getUserByHeaders($request) {
+    $headers = $request->getHeaders();
+
+    if (!preg_match('/Bearer\s(\S+)/', $headers['Authorization'][0], $matches)) {
+      return null;
+    }
+
+    $jwt = $matches[1];
+
+    if (!$jwt) {
+      return null;
+    }
+
+    $token = JWT::decode($jwt, new Key($_SERVER['JWT_SECRET_KEY'], 'HS512'));
+    $now = new \DateTimeImmutable();
+    $server = $request->getServerParams();
+
+    if ($token->iss !== $server['HTTP_HOST'] || $token->nbf > $now->getTimestamp() || $token->exp < $now->getTimestamp()) {
+      return null;
+    }
+
+    $logged_in = $token->iat;
+    $email = $token->userName;
+
+    $user = $this->getUserByEmail($email);
+
+    if ($user->getLoggedIn() != $logged_in) {
+      return null;
+    }
+    
+    return $user;
+  }    
 }

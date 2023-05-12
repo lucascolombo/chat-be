@@ -34,5 +34,5 @@ final class User
 
   public function getLoggedIn() {
     return $this->logged_in;
-  }
+  } 
 }

@@ -6,6 +6,8 @@ use App\CustomResponse as Response;
 use Pimple\Psr11\Container;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use App\Repository\ChatRepository;
+use App\Repository\UserRepository;
+use App\Lib\Encrypt;
 
 final class Chat
 {
@@ -20,7 +22,12 @@ final class Chat
     {
         $message = [ 'success' => false ];
 
+        $userRepository = new UserRepository($this->container);                                                                                
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
         $params = $request->getQueryParams();
+        $company = isset($params["company"]) && $params["company"] !== '' ? Encrypt::decode($params["company"]) : null;
         $limit = isset($params["limit"]) ? $params["limit"] : 10;
         $search = isset($params["search"]) ? $params["search"] : '';
         $nao_lido = isset($params["nao_lido"]) ? $params["nao_lido"] === "true" || $params["nao_lido"] === true  : false;
@@ -31,6 +38,6 @@ final class Chat
 
         $chatRepository = new ChatRepository($this->container);
 
-        return $response->withJson($chatRepository->getChats($limit, $search, $nao_lido, $setor, $status, $tag, $user));
+        return $response->withJson($chatRepository->getChats($company, $limit, $search, $nao_lido, $setor, $status, $tag, $user, $userId));
     }
 }
