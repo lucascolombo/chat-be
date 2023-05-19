@@ -19,10 +19,27 @@ final class Messages
         $this->container = $container;
     }
 
+    public function saveTags(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        
+        $id = $route->getArgument('id');
+        $tags = array_key_exists("tags", $body) ? $body["tags"] : null;
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($chatRepository->saveTags($id, $tags, $companyId, $userId));
+    }
+
     public function getMessages(Request $request, Response $response, array $args): Response
     {
-        $message = [ 'success' => false ];
-
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
         

@@ -35,6 +35,7 @@ $app->get('/chats', 'App\Controller\Chat:getChats')->add(Auth::class)->setName('
 $app->get('/companies', 'App\Controller\Company:getUserCompanies')->add(Auth::class)->setName('companies');
 $app->get('/filter/{id}', 'App\Controller\Company:getCompanyFiltersOptions')->add(Auth::class)->setName('filter');
 $app->get('/messages/{id}/{companyId}', 'App\Controller\Messages:getMessages')->add(Auth::class)->setName('messages');
+$app->post('/messages/{id}/tags', 'App\Controller\Messages:saveTags')->add(Auth::class)->setName('saveTags');
 $app->post('/client/{id}', 'App\Controller\Client:updateDisplayName')->add(Auth::class)->setName('updateDisplayName');
 
 $app->setBasePath($path);

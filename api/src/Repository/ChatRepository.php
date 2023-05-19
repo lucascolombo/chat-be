@@ -70,6 +70,7 @@ final class ChatRepository
         cco.client_phone,
         crd.client_avatar as avatar,
         cco.chat_last_message_add as last_time,
+        (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
         (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
       FROM clients_chats_opened cco
       INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
@@ -145,6 +146,35 @@ final class ChatRepository
     }
 
     $message = [ 'success' => true, 'messages' => $arr ];
+
+    return $message;
+  }
+
+  public function saveTags($id, $tags, $companyId, $userId) {
+    $message = [ 'success' => false ];
+
+    if ($tags !== null) {
+      $pdo = $this->container->get('db');
+
+      $stmt = $pdo->prepare("
+        DELETE cts FROM client_tags_selected cts
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = cts.company_id AND ci.invitations_employee_id = '$userId'
+        WHERE cts.chat_id = ?
+      ");
+      $stmt->execute([$id]);
+
+      foreach ($tags as $tag) {
+        $stmt = $pdo->prepare("
+          INSERT INTO client_tags_selected (tag_id, chat_id, company_id, employee_id) 
+          SELECT ?, ?, ?, ? FROM company_invitations 
+          WHERE invitations_company_id = '$companyId' AND invitations_employee_id = '$userId'
+          LIMIT 1
+        ");
+        $stmt->execute([$tag, $id, $companyId, $userId]);
+      }
+
+      $message["success"] = true;
+    }
 
     return $message;
   }
