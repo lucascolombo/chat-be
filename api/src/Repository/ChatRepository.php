@@ -70,6 +70,9 @@ final class ChatRepository
         cco.client_phone,
         crd.client_avatar as avatar,
         cco.chat_last_message_add as last_time,
+        crd.department_fixed,
+        crd.employee_fixed,
+        crd.employee_fixed_max_date,
         (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
         (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
       FROM clients_chats_opened cco
@@ -172,6 +175,48 @@ final class ChatRepository
         ");
         $stmt->execute([$tag, $id, $companyId, $userId]);
       }
+
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function assignUser($id, $assignedUserId, $assignedDate, $companyId, $userId) {
+    $message = [ 'success' => false ];
+
+    if ($assignedUserId !== null && $assignedDate !== null) {
+      $pdo = $this->container->get('db');
+
+      $stmt = $pdo->prepare("
+        UPDATE clients_registered_details as crd
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = ?
+        SET crd.employee_fixed = ?, crd.employee_fixed_max_date = ?
+        WHERE ci.invitations_company_id = ? AND ci.invitations_employee_id = ?
+        AND crd.client_id = ?
+      ");
+      $stmt->execute([$userId, $assignedUserId, $assignedDate, $companyId, $userId, $id]);
+
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function assignSetor($id, $assignedSetorId, $companyId, $userId) {
+    $message = [ 'success' => false ];
+
+    if ($assignedSetorId !== null) {
+      $pdo = $this->container->get('db');
+
+      $stmt = $pdo->prepare("
+        UPDATE clients_registered_details as crd
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = ?
+        SET crd.department_fixed = ?
+        WHERE ci.invitations_company_id = ? AND ci.invitations_employee_id = ?
+        AND crd.client_id = ?
+      ");
+      $stmt->execute([$userId, $assignedSetorId, $companyId, $userId, $id]);
 
       $message["success"] = true;
     }

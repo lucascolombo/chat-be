@@ -37,6 +37,8 @@ $app->get('/filter/{id}', 'App\Controller\Company:getCompanyFiltersOptions')->ad
 $app->get('/messages/{id}/{companyId}', 'App\Controller\Messages:getMessages')->add(Auth::class)->setName('messages');
 $app->post('/messages/{id}/tags', 'App\Controller\Messages:saveTags')->add(Auth::class)->setName('saveTags');
 $app->post('/client/{id}', 'App\Controller\Client:updateDisplayName')->add(Auth::class)->setName('updateDisplayName');
+$app->post('/messages/{id}/assign-user', 'App\Controller\Messages:assignUser')->add(Auth::class)->setName('assignUser');
+$app->post('/messages/{id}/assign-setor', 'App\Controller\Messages:assignSetor')->add(Auth::class)->setName('assignSetor');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

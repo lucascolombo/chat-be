@@ -55,7 +55,7 @@ final class Home
     }
 
     private function createJWT(Request $request, String $username, \DateTimeImmutable $issuedAt) {
-        $expire = $issuedAt->modify('+60 minutes')->getTimestamp();
+        $expire = $issuedAt->modify('+24 hours')->getTimestamp();
         $serverName = $request->getServerParams()['HTTP_HOST'];                                   
 
         $data = [

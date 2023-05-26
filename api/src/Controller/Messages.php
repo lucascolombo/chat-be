@@ -38,6 +38,45 @@ final class Messages
         return $response->withJson($chatRepository->saveTags($id, $tags, $companyId, $userId));
     }
 
+    public function assignUser(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        
+        $id = $route->getArgument('id');
+        $assignedUserId = array_key_exists("user", $body) ? $body["user"] : null;
+        $assignedDate = array_key_exists("date", $body) ? $body["date"] : null;
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($chatRepository->assignUser($id, $assignedUserId, $assignedDate, $companyId, $userId));
+    }
+
+    public function assignSetor(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        
+        $id = $route->getArgument('id');
+        $assignedSetorId = array_key_exists("setor", $body) ? $body["setor"] : null;
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($chatRepository->assignSetor($id, $assignedSetorId, $companyId, $userId));
+    }
+
     public function getMessages(Request $request, Response $response, array $args): Response
     {
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
