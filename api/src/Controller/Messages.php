@@ -58,6 +58,42 @@ final class Messages
         return $response->withJson($chatRepository->assignUser($id, $assignedUserId, $assignedDate, $companyId, $userId));
     }
 
+    public function addToQueue(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        
+        $id = $route->getArgument('id');
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($chatRepository->addToQueue($id, $userId, $companyId));
+    }
+
+    public function removeToQueue(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        
+        $id = $route->getArgument('id');
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($chatRepository->removeToQueue($id, $userId, $companyId));
+    }
+
     public function assignSetor(Request $request, Response $response, array $args): Response
     {
         $routeContext = RouteContext::fromRequest($request);                                                                                                             

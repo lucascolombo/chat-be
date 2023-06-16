@@ -39,6 +39,9 @@ $app->post('/messages/{id}/tags', 'App\Controller\Messages:saveTags')->add(Auth:
 $app->post('/client/{id}', 'App\Controller\Client:updateDisplayName')->add(Auth::class)->setName('updateDisplayName');
 $app->post('/messages/{id}/assign-user', 'App\Controller\Messages:assignUser')->add(Auth::class)->setName('assignUser');
 $app->post('/messages/{id}/assign-setor', 'App\Controller\Messages:assignSetor')->add(Auth::class)->setName('assignSetor');
+$app->post('/messages/{id}/add-to-queue', 'App\Controller\Messages:addToQueue')->add(Auth::class)->setName('addToQueue');
+$app->post('/messages/{id}/remove-to-queue', 'App\Controller\Messages:removeToQueue')->add(Auth::class)->setName('removeToQueue');
+$app->post('/client/{id}/start', 'App\Controller\Client:start')->add(Auth::class)->setName('start');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

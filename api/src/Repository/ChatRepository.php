@@ -73,6 +73,11 @@ final class ChatRepository
         crd.department_fixed,
         crd.employee_fixed,
         crd.employee_fixed_max_date,
+        cco.chat_standby as queue,
+        cco.chat_employee_id,
+        IF(cco.chat_employee_id = '$userId', 1, 0) as chat_is_mine,
+        IF(cco.chat_standby = '$userId', 1, 0) as queue_is_mine,
+        (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
         (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
         (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
       FROM clients_chats_opened cco
@@ -126,7 +131,9 @@ final class ChatRepository
         cm.message_type
       FROM clients_messages cm
       LEFT JOIN employee_details ed ON ed.employee_id = cm.who_sent
-      WHERE cm.chat_id = '$id'
+      INNER JOIN clients_registered_details crd ON crd.client_id = cm.client_id
+      INNER JOIN clients_chats_opened cco ON cco.chat_id = cm.chat_id
+      WHERE crd.client_id = '$id'
       AND cm.company_id = '$companyId'
       AND cm.company_id IN (
         SELECT invitations_company_id
@@ -217,6 +224,49 @@ final class ChatRepository
         AND crd.client_id = ?
       ");
       $stmt->execute([$userId, $assignedSetorId, $companyId, $userId, $id]);
+
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function addToQueue($id, $userId, $companyId) {
+    $message = [ 'success' => false ];
+
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+
+      $stmt = $pdo->prepare("
+        UPDATE clients_chats_opened as cco
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = cco.company_id AND ci.invitations_employee_id = ?
+        SET cco.chat_standby = ?
+        WHERE ci.invitations_company_id = ?
+        AND cco.chat_id = ?
+      ");
+      $stmt->execute([$userId, $userId, $companyId, $id]);
+
+      $message["queue"] = $userId;
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function removeToQueue($id, $userId, $companyId) {
+    $message = [ 'success' => false ];
+
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+
+      $stmt = $pdo->prepare("
+        UPDATE clients_chats_opened as cco
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = cco.company_id AND ci.invitations_employee_id = ?
+        SET cco.chat_standby = 0
+        WHERE ci.invitations_company_id = ?
+        AND cco.chat_id = ?
+      ");
+      $stmt->execute([$userId, $companyId, $id]);
 
       $message["success"] = true;
     }
