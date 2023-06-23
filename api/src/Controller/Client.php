@@ -51,4 +51,22 @@ final class Client
 
         return $response->withJson($clientRepository->start($id, $companyId, $userId));
     }
+
+    public function finish(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        
+        $id = $route->getArgument('id');
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $userRepository = new UserRepository($this->container);
+        $clientRepository = new ClientRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($clientRepository->finish($id, $companyId, $userId));
+    }
 }

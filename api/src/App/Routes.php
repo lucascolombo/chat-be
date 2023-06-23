@@ -42,6 +42,7 @@ $app->post('/messages/{id}/assign-setor', 'App\Controller\Messages:assignSetor')
 $app->post('/messages/{id}/add-to-queue', 'App\Controller\Messages:addToQueue')->add(Auth::class)->setName('addToQueue');
 $app->post('/messages/{id}/remove-to-queue', 'App\Controller\Messages:removeToQueue')->add(Auth::class)->setName('removeToQueue');
 $app->post('/client/{id}/start', 'App\Controller\Client:start')->add(Auth::class)->setName('start');
+$app->post('/client/{id}/finish', 'App\Controller\Client:finish')->add(Auth::class)->setName('finish');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

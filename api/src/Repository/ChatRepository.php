@@ -46,10 +46,12 @@ final class ChatRepository
       else if ($status == 1) {
         $status_query = " AND cco.employee_id > '0' AND cco.chat_date_close = '0' ";
       }
-      
       if ($status == 4) {
-        $status_query = " AND cco.chat_date_close > '0' AND cco.chat_date_close > ( SELECT chat_date_start FROM clients_chats_opened where client_id = cco.client_id ORDER BY chat_date_start DESC LIMIT 1 )";
+        $status_query = " AND cco.chat_date_close > ( SELECT chat_date_start FROM clients_chats_opened where client_id = cco.client_id ORDER BY chat_date_start DESC LIMIT 1 )";
       }
+    }
+    else {
+      $status_query = " AND cco.chat_date_close <= 0 ";
     }
 
     $user_query = "";
@@ -62,43 +64,44 @@ final class ChatRepository
       $nao_lido_query = " AND cco.chat_last_message_add > cco.chat_employee_last_seen AND chat_last_message_who = 'C' ";
     }
 
-    $stmt = $pdo->query("
-      SELECT 
-        cco.chat_id as id,
-        cco.client_id,
-        IF(crd.client_name = '', cco.client_phone, crd.client_name) as exhibition_name,
-        cco.client_phone,
-        crd.client_avatar as avatar,
-        cco.chat_last_message_add as last_time,
-        crd.department_fixed,
-        crd.employee_fixed,
-        crd.employee_fixed_max_date,
-        cco.chat_standby as queue,
-        cco.chat_employee_id,
-        IF(cco.chat_employee_id = '$userId', 1, 0) as chat_is_mine,
-        IF(cco.chat_standby = '$userId', 1, 0) as queue_is_mine,
-        (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
-        (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
-        (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
-      FROM clients_chats_opened cco
-      INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
-      {$tag_query}
-      WHERE cco.chat_date_close <= 0
-      {$search_query}
-      {$setor_query}
-      {$status_query}
-      {$user_query}
-      {$nao_lido_query}
-      AND cco.company_id = '$company'
-      AND cco.company_id IN (
-        SELECT invitations_company_id
-        FROM company_invitations 
-        WHERE invitations_employee_id = '$userId'
-        AND invitations_accept > 0 
-        AND invitations_finish = 0
-      )
-      LIMIT {$limit}
-    ");
+    $query = "
+    SELECT 
+      cco.chat_id as id,
+      cco.client_id,
+      IF(crd.client_name = '', cco.client_phone, crd.client_name) as exhibition_name,
+      cco.client_phone,
+      crd.client_avatar as avatar,
+      cco.chat_last_message_add as last_time,
+      crd.department_fixed,
+      crd.employee_fixed,
+      crd.employee_fixed_max_date,
+      cco.chat_standby as queue,
+      cco.chat_employee_id,
+      IF(cco.chat_employee_id = '$userId', 1, 0) as chat_is_mine,
+      IF(cco.chat_standby = '$userId', 1, 0) as queue_is_mine,
+      (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
+      (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
+      (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
+    FROM clients_chats_opened cco
+    INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+    {$tag_query}
+    WHERE cco.company_id = '$company'
+    {$search_query}
+    {$setor_query}
+    {$status_query}
+    {$user_query}
+    {$nao_lido_query}
+    AND cco.company_id IN (
+      SELECT invitations_company_id
+      FROM company_invitations 
+      WHERE invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    )
+    LIMIT {$limit}
+  ";
+
+    $stmt = $pdo->query($query);
     $fetch = $stmt->fetchAll();
     $arr = [];
 
@@ -108,7 +111,7 @@ final class ChatRepository
       $arr[] = $element;
     }
 
-    $message = [ 'success' => true, 'chats' => $arr, 'company'=> $company ];
+    $message = [ 'success' => true, 'chats' => $arr, 'company'=> $company, 'query' => $query ];
 
     return $message;
   }
