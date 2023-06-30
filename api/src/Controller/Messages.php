@@ -132,4 +132,42 @@ final class Messages
 
         return $response->withJson($chatRepository->getAllMessages($id, $limit, $userId, $companyId));
     }
+
+    public function transferSetor(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        
+        $id = $route->getArgument('id');
+        $setor = array_key_exists("setor", $body) ? $body["setor"] : null;
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($chatRepository->transferSetor($id, $setor, $companyId, $userId));
+    }
+
+    public function transferUser(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        
+        $id = $route->getArgument('id');
+        $userTransfer = array_key_exists("user", $body) ? $body["user"] : null;
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($chatRepository->transferUser($id, $userTransfer, $companyId, $userId));
+    }
 }

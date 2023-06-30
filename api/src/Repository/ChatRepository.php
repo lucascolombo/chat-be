@@ -121,6 +121,8 @@ final class ChatRepository
 
     $pdo = $this->container->get('db');
 
+    $datetime = time();
+
     $stmt = $pdo->query("
       SELECT 
         cm.message_id_external,
@@ -131,13 +133,12 @@ final class ChatRepository
         cm.message_created,
         cm.message_status_time,
         cm.message_status,
-        cm.message_type
+        cm.message_type,
+        cm.message_deleted_date
       FROM clients_messages cm
       LEFT JOIN employee_details ed ON ed.employee_id = cm.who_sent
-      INNER JOIN clients_registered_details crd ON crd.client_id = cm.client_id
-      INNER JOIN clients_chats_opened cco ON cco.chat_id = cm.chat_id
-      WHERE crd.client_id = '$id'
-      AND cm.company_id = '$companyId'
+      WHERE cm.client_id = '$id'
+      AND cm.message_created <= '$datetime'
       AND cm.company_id IN (
         SELECT invitations_company_id
         FROM company_invitations 
@@ -145,7 +146,7 @@ final class ChatRepository
         AND invitations_accept > 0 
         AND invitations_finish = 0
       )
-      ORDER BY cm.message_created ASC
+      ORDER BY cm.message_created DESC
       LIMIT {$limit}
     ");
     $fetch = $stmt->fetchAll();
@@ -158,7 +159,7 @@ final class ChatRepository
       $arr[] = $element;
     }
 
-    $message = [ 'success' => true, 'messages' => $arr ];
+    $message = [ 'success' => true, 'messages' => array_reverse($arr) ];
 
     return $message;
   }
@@ -271,6 +272,141 @@ final class ChatRepository
       ");
       $stmt->execute([$userId, $companyId, $id]);
 
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function transferSetor($id, $setor, $companyId, $userId) {
+    $message = [ 'success' => false ];
+
+    if ($setor !== null) {
+      $pdo = $this->container->get('db');
+
+      $datetime = time();
+
+      $stmt = $pdo->query("
+        SELECT departments_name
+        FROM company_departments
+        WHERE departments_id = '$setor'
+      ");
+      $employee = $stmt->fetch();
+      $departamento = $employee['departments_name'];
+
+      $stmt = $pdo->query("
+        SELECT employee_name
+        FROM employee_details
+        WHERE employee_id = '$userId'
+      ");
+      $employee = $stmt->fetch();
+      $usuario = $employee['employee_name'];
+
+      $stmt = $pdo->query("
+        SELECT *
+        FROM clients_chats_opened cco
+        INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = '$userId'
+        WHERE cco.chat_date_close = 0
+        AND crd.client_id = '$id'
+        AND ci.invitations_company_id = '$companyId'
+        AND ci.invitations_employee_id = '$userId'
+        ORDER BY cco.chat_id DESC
+        LIMIT 1
+      ");
+      $lastChat = $stmt->fetch();
+      $lastChatId = $lastChat["chat_id"];
+
+      $stmt = $pdo->prepare("
+        UPDATE clients_chats_opened as cco
+        INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+        SET cco.chat_date_close = ?
+        WHERE cco.chat_date_close = 0
+        AND crd.client_id = ?
+      ");
+      $stmt->execute([$datetime, $id]);
+
+      $stmt = $pdo->prepare("
+        INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ");
+      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $setor, $userId, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who']]);
+
+      $newChatId = $pdo->lastInsertId();
+
+      $stmt = $pdo->prepare("
+        INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ");
+      $stmt->execute([$newChatId, $id, $lastChat['client_phone'], $companyId, $setor, $userId, 'SENT-DEVICE', $datetime, $datetime, "Atendimento Transferido por $usuario para o Departamento $departamento.", $lastChat['device_id'], '1']);
+      
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function transferUser($id, $user, $companyId, $userId) {
+    $message = [ 'success' => false ];
+
+    if ($user !== null) {
+      $pdo = $this->container->get('db');
+
+      $datetime = time();
+
+      $stmt = $pdo->query("
+        SELECT employee_name
+        FROM employee_details
+        WHERE employee_id = '$user'
+      ");
+      $employee = $stmt->fetch();
+      $usuario_transferido = $employee['employee_name'];
+
+      $stmt = $pdo->query("
+        SELECT employee_name
+        FROM employee_details
+        WHERE employee_id = '$userId'
+      ");
+      $employee = $stmt->fetch();
+      $usuario = $employee['employee_name'];
+
+      $stmt = $pdo->query("
+        SELECT *
+        FROM clients_chats_opened cco
+        INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = '$userId'
+        WHERE cco.chat_date_close = 0
+        AND crd.client_id = '$id'
+        AND ci.invitations_company_id = '$companyId'
+        AND ci.invitations_employee_id = '$userId'
+        ORDER BY cco.chat_id DESC
+        LIMIT 1
+      ");
+      $lastChat = $stmt->fetch();
+
+      $stmt = $pdo->prepare("
+        UPDATE clients_chats_opened as cco
+        INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+        SET cco.chat_date_close = ?
+        WHERE cco.chat_date_close = 0
+        AND crd.client_id = ?
+      ");
+      $stmt->execute([$datetime, $id]);
+
+      $stmt = $pdo->prepare("
+        INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ");
+      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $lastChat['chat_department_id'], $user, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who']]);
+
+      $newChatId = $pdo->lastInsertId();
+
+      $stmt = $pdo->prepare("
+        INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ");
+      $stmt->execute([$newChatId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, $datetime, "Atendimento Transferido por $usuario para $usuario_transferido.", $lastChat['device_id'], '1']);
+      
       $message["success"] = true;
     }
 
