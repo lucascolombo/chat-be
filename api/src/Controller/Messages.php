@@ -170,4 +170,26 @@ final class Messages
 
         return $response->withJson($chatRepository->transferUser($id, $userTransfer, $companyId, $userId));
     }
+
+    public function sendMessage(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        $files = $request->getUploadedFiles();
+        
+        $id = $route->getArgument('id');
+
+        $text = array_key_exists("text", $body) ? $body["text"] : "";
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+        $scheduleDate = array_key_exists("scheduleDate", $body) ? $body["scheduleDate"] : 0;
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($chatRepository->sendMessage($id, $userId, $companyId, $text, $scheduleDate, $files));
+    }
 }

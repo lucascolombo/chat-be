@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use Pimple\Psr11\Container;
 use App\Lib\Chat;
+use Slim\Psr7\UploadedFile;
 
 final class ChatRepository
 {
@@ -407,6 +408,70 @@ final class ChatRepository
       ");
       $stmt->execute([$newChatId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, $datetime, "Atendimento Transferido por $usuario para $usuario_transferido.", $lastChat['device_id'], '1']);
       
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  private function moveUploadedFile($directory, UploadedFile $uploadedFile, $basename) {
+    $extension = pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION);
+    $filename = $basename . "." . $extension;
+
+    $uploadedFile->moveTo($directory . DIRECTORY_SEPARATOR . $filename);
+
+    return $filename;
+  }
+
+  public function sendMessage($id, $userId, $companyId, $text, $scheduleDate, $files) {
+    $dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/' . $id;
+
+    $message = [ 'success' => false, "files" => [], "dir" => $dir ];
+
+    if (!file_exists($dir)) {
+      mkdir($dir, 0777, true);
+    }
+
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+      $datetime = time();
+
+      $stmt = $pdo->query("
+        SELECT *
+        FROM clients_chats_opened cco
+        INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = '$userId'
+        WHERE cco.chat_date_close = 0
+        AND crd.client_id = '$id'
+        AND ci.invitations_company_id = '$companyId'
+        AND ci.invitations_employee_id = '$userId'
+        ORDER BY cco.chat_id DESC
+        LIMIT 1
+      ");
+      $lastChat = $stmt->fetch();
+
+      $stmt = $pdo->prepare("
+        INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ");
+      $stmt->execute([$lastChat["chat_id"], $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id']]);
+      
+      $index = 0;
+      foreach($files["files"] as $file) {
+        if ($file->getError() === UPLOAD_ERR_OK) {
+          $basename = $lastChat["chat_id"] . "_" . $index . "_" . $datetime;
+          $filename = $this->moveUploadedFile($dir, $file, $basename);
+
+          $stmt = $pdo->prepare("
+            INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ");
+          $stmt->execute([$lastChat["chat_id"], $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $filename, $lastChat['device_id']]);
+      
+          $index++;
+        }
+      }
+
       $message["success"] = true;
     }
 

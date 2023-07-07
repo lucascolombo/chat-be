@@ -25,8 +25,9 @@
         "ext-json": "*",
         "ext-pdo": "*",
         "firebase/php-jwt": "^6.3",
+        "guzzlehttp/psr7": "^2.4",
         "pimple/pimple": "^3.2",
-        "slim/psr7": "^1.4.0",
+        "slim/psr7": "^1.6",
         "slim/slim": "^4.5",
         "vlucas/phpdotenv": "^5.1"
     },
