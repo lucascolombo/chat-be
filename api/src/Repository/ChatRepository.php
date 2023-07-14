@@ -6,6 +6,135 @@ use Pimple\Psr11\Container;
 use App\Lib\Chat;
 use Slim\Psr7\UploadedFile;
 
+class SendSimpleText { 
+  private $instancia; 
+  private $token; 
+  private $phone; 
+  private $message; 
+  private $ReplyMessageId; 
+
+  public function __construct($instancia,$token,$phone,$message,$ReplyMessageId){
+      $this->instancia = $instancia;
+      $this->token = $token; 
+      $this->phone = $phone;
+      $this->message = $message;
+      $this->ReplyMessageId = $ReplyMessageId;
+  }
+
+  public function send() {
+      //if (strlen($this->phone) <= 11){$this->phone = "55".$this->phone;}
+
+      $client = curl_init();
+  
+      $data = json_encode(array(
+          "phone"  => $this->phone,
+          "message" => $this->message,
+          "messageId"  => $this->ReplyMessageId
+      ));
+  
+      curl_setopt_array($client, array(
+        CURLOPT_URL => "https://api.z-api.io/instances/".$this->instancia."/token/".$this->token."/send-text",
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "POST",
+        CURLOPT_POSTFIELDS => $data,
+        CURLOPT_HTTPHEADER => array(
+          "content-type: application/json"
+        ),
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_CONNECTTIMEOUT => 5
+      ));
+  
+      $response = curl_exec($client);
+      $err = curl_error($client);
+      $MessageID = json_decode($response);
+      $MessageID = $MessageID->messageId;
+  
+      curl_close($client);
+  
+      if (strpos($response, 'erro') !== false) { 
+        return null;
+      } else { 
+        return $MessageID; 
+      }
+  }
+}
+
+class SendMedia { 
+  private $instancia; 
+  private $token; 
+  private $phone; 
+  private $LinkMedia; 
+  
+  public function __construct($instancia,$token,$phone,$LinkMedia){
+      $this->instancia = $instancia;
+      $this->token = $token; 
+      $this->phone = $phone;
+      $this->LinkMedia = $LinkMedia;
+  }
+
+  public function send() {
+      //if (strlen($this->phone) <= 11){$this->phone = "55".$this->phone;}
+      $extension = strtolower(pathinfo($this->LinkMedia, PATHINFO_EXTENSION));
+
+      if (strpos($extension, 'acc') !== false) {$MediaType = "audio";}
+      elseif (strpos($extension, 'amr') !== false) {$MediaType = "audio";}
+      elseif (strpos($extension, 'mpeg') !== false) {$MediaType = "audio";}
+      elseif (strpos($extension, 'ogg') !== false) {$MediaType = "audio";}
+      elseif (strpos($extension, 'jpg') !== false) {$MediaType = "image";}
+      elseif (strpos($extension, 'png') !== false) {$MediaType = "image";}
+      elseif (strpos($extension, 'mp4') !== false) {$MediaType = "video";}
+      elseif (strpos($extension, '3gpp') !== false) {$MediaType = "video";}
+      elseif (strpos($extension, 'webp') !== false) {$MediaType = "sticker";}
+      elseif (strpos($extension, 'pdf') !== false) {$MediaType = "document";}
+      elseif (strpos($extension, 'doc') !== false) {$MediaType = "document";}
+      elseif (strpos($extension, 'dot') !== false) {$MediaType = "document";}
+      else{ $MediaType = "document"; }
+
+      $client = curl_init();
+  
+      $data = json_encode(array(
+          "phone"  => $this->phone,
+          $MediaType => $this->LinkMedia,
+          "caption" =>  "Anexo",
+          "fileName" =>  "Arquivo"
+      ));
+
+      if ($MediaType == "document"){
+        $MediaType = $MediaType."/".$extension;
+      }
+  
+      curl_setopt_array($client, array(
+        CURLOPT_URL => "https://api.z-api.io/instances/".$this->instancia."/token/".$this->token."/send-".$MediaType,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "POST",
+        CURLOPT_POSTFIELDS => $data,
+        CURLOPT_HTTPHEADER => array(
+          "Content-Type: application/json"
+        ),
+      ));
+  
+      $response = curl_exec($client);
+      $err = curl_error($client);
+      $MessageID = json_decode($response);
+      $MessageID = $MessageID->messageId;
+      curl_close($client);
+  
+      if (strpos($response, 'error') !== false) {
+        return null;
+      } else {
+        return $MessageID;
+      }
+  }
+}
+
 final class ChatRepository
 {
   private $container;
@@ -414,8 +543,7 @@ final class ChatRepository
     return $message;
   }
 
-  private function moveUploadedFile($directory, UploadedFile $uploadedFile, $basename) {
-    $extension = pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION);
+  private function moveUploadedFile($directory, UploadedFile $uploadedFile, $basename, $extension) {
     $filename = $basename . "." . $extension;
 
     $uploadedFile->moveTo($directory . DIRECTORY_SEPARATOR . $filename);
@@ -424,9 +552,13 @@ final class ChatRepository
   }
 
   public function sendMessage($id, $userId, $companyId, $text, $scheduleDate, $files) {
+    $instancia = "";
+    $token = "";
+    $phone = "";
+
     $dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/' . $id;
 
-    $message = [ 'success' => false, "files" => [], "dir" => $dir ];
+    $message = [ 'success' => false, "dir" => $dir ];
 
     if (!file_exists($dir)) {
       mkdir($dir, 0777, true);
@@ -450,24 +582,42 @@ final class ChatRepository
       ");
       $lastChat = $stmt->fetch();
 
-      $stmt = $pdo->prepare("
-        INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ");
-      $stmt->execute([$lastChat["chat_id"], $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id']]);
-      
+      $sender = new SendSimpleText($instancia, $token, $phone, $text, "");
+      // $messageExternalId = $sender->send();
+      $messageExternalId = 0;
+
+      if ($messageExternalId !== null) {
+        $stmt = $pdo->prepare("
+          INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id']]);
+      }
+
       $index = 0;
       foreach($files["files"] as $file) {
         if ($file->getError() === UPLOAD_ERR_OK) {
-          $basename = $lastChat["chat_id"] . "_" . $index . "_" . $datetime;
-          $filename = $this->moveUploadedFile($dir, $file, $basename);
+          $extension = pathinfo($file->getClientFilename(), PATHINFO_EXTENSION);
 
-          $stmt = $pdo->prepare("
-            INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ");
-          $stmt->execute([$lastChat["chat_id"], $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $filename, $lastChat['device_id']]);
-      
+          $datetime = time();
+          $basename = $lastChat["chat_id"] . "_" . $index . "_" . $datetime;
+          
+          $filename = $this->moveUploadedFile($dir, $file, $basename, $extension);
+
+          $filePath = 'http://' . $_SERVER['HTTP_HOST'] . '/file/' . $id . '/' . $filename;
+
+          $midiaSender = new SendMedia($instancia, $token, $phone, $filePath);
+          // $messageExternalId = $midiaSender->send();
+          $messageExternalId = 0;
+
+          if ($messageExternalId !== null) {
+            $stmt = $pdo->prepare("
+              INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, message_type) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $filePath, $lastChat['device_id']], '1');
+          }
+
           $index++;
         }
       }
