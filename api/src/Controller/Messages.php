@@ -192,4 +192,22 @@ final class Messages
 
         return $response->withJson($chatRepository->sendMessage($id, $userId, $companyId, $text, $scheduleDate, $files));
     }
+
+    public function read(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        
+        $id = $route->getArgument('id');
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($chatRepository->read($id, $userId, $companyId));
+    }
 }

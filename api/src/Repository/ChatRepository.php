@@ -228,6 +228,7 @@ final class ChatRepository
       AND invitations_accept > 0 
       AND invitations_finish = 0
     )
+    ORDER BY chat_last_message_add DESC
     LIMIT {$limit}
   ";
 
@@ -551,6 +552,49 @@ final class ChatRepository
     return $filename;
   }
 
+  public function read($id, $userId, $companyId) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+    $datetime = time();
+
+    $stmt = $pdo->query("
+      SELECT *
+      FROM clients_chats_opened cco
+      INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+      INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = '$userId'
+      WHERE cco.chat_date_close = 0
+      AND crd.client_id = '$id'
+      AND ci.invitations_company_id = '$companyId'
+      AND ci.invitations_employee_id = '$userId'
+      ORDER BY cco.chat_id DESC
+      LIMIT 1
+    ");
+    $lastChat = $stmt->fetch();
+
+    if ($companyId !== null) {
+      $stmt = $pdo->prepare("
+        UPDATE clients_chats_opened as cco
+        SET cco.chat_employee_last_seen = ?
+        WHERE cco.chat_id = ?
+      ");
+      $stmt->execute([$datetime, $lastChat["chat_id"]]);
+
+      $stmt = $pdo->prepare("
+        UPDATE clients_messages
+        SET message_status = 'READ', 
+        message_status_time = ? 
+        WHERE chat_id = ?
+        AND who_sent = 0
+      ");
+      $stmt->execute([$datetime, $lastChat["chat_id"]]);
+
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
   public function sendMessage($id, $userId, $companyId, $text, $scheduleDate, $files) {
     $instancia = "";
     $token = "";
@@ -593,6 +637,14 @@ final class ChatRepository
         ");
         $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id']]);
       }
+
+      $stmt = $pdo->prepare("
+        UPDATE clients_chats_opened as cco
+        SET cco.chat_last_message_add = ?, 
+        cco.chat_last_message_who = 'E' 
+        WHERE cco.chat_id = ?
+      ");
+      $stmt->execute([$datetime, $lastChat["chat_id"]]);
 
       $index = 0;
       foreach($files["files"] as $file) {
