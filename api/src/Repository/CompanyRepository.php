@@ -129,11 +129,14 @@ final class CompanyRepository
     $pdo = $this->container->get('db');
 
     $stmt = $pdo->query("
-        SELECT invitations_company_id as id
-        FROM company_invitations 
-        WHERE invitations_employee_id = '$userId' 
-        AND invitations_accept > 0 
-        AND invitations_finish = 0
+        SELECT 
+          c.company_id as id, 
+          c.company_name as name 
+        FROM company_details c 
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = c.company_id
+        WHERE ci.invitations_employee_id = '$userId'
+        AND ci.invitations_accept > 0
+        AND ci.invitations_finish = 0
     ");
     $fetch = $stmt->fetchAll();
     $arr = [];
@@ -145,6 +148,36 @@ final class CompanyRepository
     }
 
     $message = [ 'success' => true, 'companies' => $arr ];
+
+    return $message;
+  }
+
+  public function getCompanyData($userId, $companyId) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->query("
+        SELECT 
+          c.company_id as id, 
+          c.company_name as name,
+          c.company_mail as email,
+          c.company_tel as phone,
+          c.company_manager as manager,
+          c.company_create as created_at
+        FROM company_details c 
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = c.company_id
+        WHERE ci.invitations_employee_id = '$userId'
+        AND ci.invitations_accept > 0
+        AND ci.invitations_finish = 0
+        AND c.company_id = '$companyId'
+    ");
+    $element = $stmt->fetch();
+
+    $element["id"] = Encrypt::encode($element["id"]);
+    $element["created_at"] = date("d/m/Y H:i:s", $element["created_at"]);
+
+    $message = [ 'success' => true, 'company' => $element ];
 
     return $message;
   }

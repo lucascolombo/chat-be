@@ -48,6 +48,7 @@ $app->post('/messages/{id}/transfer-setor', 'App\Controller\Messages:transferSet
 $app->post('/messages/{id}/transfer-user', 'App\Controller\Messages:transferUser')->add(Auth::class)->setName('transferUser');
 $app->post('/messages/{id}/send-message', 'App\Controller\Messages:sendMessage')->add(Auth::class)->setName('sendMessage');
 $app->post('/messages/{id}/read', 'App\Controller\Messages:read')->add(Auth::class)->setName('read');
+$app->get('/company/{id}', 'App\Controller\Company:getCompanyData')->add(Auth::class)->setName('company');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

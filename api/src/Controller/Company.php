@@ -49,4 +49,21 @@ final class Company
 
         return $response->withJson($companyRepository->getUserCompanies($userId));
     }
+
+    public function getCompanyData(Request $request, Response $response): Response
+    {
+        $message = [ 'success' => false ];
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $id = Encrypt::decode($route->getArgument('id'));
+
+        $companyRepository = new CompanyRepository($this->container);
+
+        $userRepository = new UserRepository($this->container);                                                                                
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->getCompanyData($userId, $id));
+    }
 }
