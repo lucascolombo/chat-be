@@ -265,7 +265,8 @@ final class ChatRepository
         cm.message_status_time,
         cm.message_status,
         cm.message_type,
-        cm.message_deleted_date
+        cm.message_deleted_date,
+        cm.message_edited_date
       FROM clients_messages cm
       LEFT JOIN employee_details ed ON ed.employee_id = cm.who_sent
       WHERE cm.client_id = '$id'
@@ -287,6 +288,8 @@ final class ChatRepository
     foreach ($fetch as $single) {
       $element = $single;
       $element["datetime"] = date("d/m/Y H:i:s", $element["message_created"]);
+      $element["datetime_deleted"] = date("d/m/Y H:i:s", $element["message_deleted_date"]);
+      $element["datetime_edited"] = date("d/m/Y H:i:s", $element["message_edited_date"]);
       $arr[] = $element;
     }
 
