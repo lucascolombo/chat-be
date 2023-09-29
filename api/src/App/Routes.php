@@ -29,7 +29,7 @@ class Auth {
   }
 }
 
-$app->post('/', 'App\Controller\Home:home')->setName('home');
+$app->get('/', 'App\Controller\Home:home')->setName('home');
 $app->post('/auth', 'App\Controller\Home:doLogin')->setName('login');
 $app->get('/file/{id}/{filename}', 'App\Controller\File:getFile')->setName('getFile');
 $app->get('/chats', 'App\Controller\Chat:getChats')->add(Auth::class)->setName('chats');

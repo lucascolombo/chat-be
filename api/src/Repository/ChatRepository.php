@@ -37,7 +37,7 @@ class SendSimpleText {
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_ENCODING => "",
         CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 30,
+        CURLOPT_TIMEOUT => 60,
         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
         CURLOPT_CUSTOMREQUEST => "POST",
         CURLOPT_POSTFIELDS => $data,
@@ -112,7 +112,7 @@ class SendMedia {
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_ENCODING => "",
         CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 30,
+        CURLOPT_TIMEOUT => 60,
         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
         CURLOPT_CUSTOMREQUEST => "POST",
         CURLOPT_POSTFIELDS => $data,
@@ -599,13 +599,9 @@ final class ChatRepository
   }
 
   public function sendMessage($id, $userId, $companyId, $text, $scheduleDate, $files) {
-    $instancia = "";
-    $token = "";
-    $phone = "";
-
     $dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/' . $id;
 
-    $message = [ 'success' => false, "dir" => $dir ];
+    $message = [ 'success' => false, "files" => [] ];
 
     if (!file_exists($dir)) {
       mkdir($dir, 0777, true);
@@ -628,26 +624,34 @@ final class ChatRepository
         LIMIT 1
       ");
       $lastChat = $stmt->fetch();
+      $device_id = $lastChat["device_id"];
+      $phone = $lastChat['client_phone'];
 
-      $sender = new SendSimpleText($instancia, $token, $phone, $text, "");
-      // $messageExternalId = $sender->send();
-      $messageExternalId = 0;
+      $stmt = $pdo->query("
+        SELECT 
+          device_login as instancia, 
+          device_pass as token,
+          device_status as status
+        FROM company_devices WHERE device_id = '$device_id' 
+      ");
+      $device = $stmt->fetch();
+      $instancia = $device["instancia"];
+      $token = $device["token"];
+      $status = $device["status"];
 
-      if ($messageExternalId !== null) {
+      if ($scheduleDate == 0 && $status == 0) {
+        $sender = new SendSimpleText($instancia, $token, $phone, $text, "");
+        $messageExternalId = $sender->send();
+      }
+      else $messageExternalId = 0;
+
+      if ($text != "" && $messageExternalId !== null) {
         $stmt = $pdo->prepare("
           INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id']]);
+        $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id']]);
       }
-
-      $stmt = $pdo->prepare("
-        UPDATE clients_chats_opened as cco
-        SET cco.chat_last_message_add = ?, 
-        cco.chat_last_message_who = 'E' 
-        WHERE cco.chat_id = ?
-      ");
-      $stmt->execute([$datetime, $lastChat["chat_id"]]);
 
       $index = 0;
       foreach($files["files"] as $file) {
@@ -659,23 +663,33 @@ final class ChatRepository
           
           $filename = $this->moveUploadedFile($dir, $file, $basename, $extension);
 
-          $filePath = 'http://' . $_SERVER['HTTP_HOST'] . '/file/' . $id . '/' . $filename;
+          $filePath = 'https://' . $_SERVER['HTTP_HOST'] . '/file/' . $id . '/' . $filename;
 
-          $midiaSender = new SendMedia($instancia, $token, $phone, $filePath);
-          // $messageExternalId = $midiaSender->send();
-          $messageExternalId = 0;
+          if ($scheduleDate == 0 && $status == 0) {
+            $midiaSender = new SendMedia($instancia, $token, $phone, $filePath);
+            $messageExternalId = $midiaSender->send();
+          }
+          else $messageExternalId = 0;
 
           if ($messageExternalId !== null) {
             $stmt = $pdo->prepare("
               INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, message_type) 
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $filePath, $lastChat['device_id']], '1');
+            $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $filePath, $lastChat['device_id'], '1']);
           }
 
           $index++;
         }
       }
+
+      $stmt = $pdo->prepare("
+        UPDATE clients_chats_opened as cco
+        SET cco.chat_last_message_add = ?, 
+        cco.chat_last_message_who = 'E' 
+        WHERE cco.chat_id = ?
+      ");
+      $stmt->execute([$datetime, $lastChat["chat_id"]]);
 
       $message["success"] = true;
     }

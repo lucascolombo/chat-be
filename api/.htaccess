@@ -1,0 +1,5 @@
+<IfModule mod_rewrite.c>
+   RewriteEngine On
+   RewriteCond %{HTTP_HOST} ^api\.multichat\.app\.br$ [NC]
+   RewriteRule ^(.*)$ /public/$1 [L]
+</IfModule>
