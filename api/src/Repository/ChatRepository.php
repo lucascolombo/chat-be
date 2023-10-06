@@ -211,6 +211,7 @@ final class ChatRepository
       IF(cco.chat_standby = '$userId', 1, 0) as queue_is_mine,
       (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
       (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
+      (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND schedule_message > 0 AND message_created > UNIX_TIMESTAMP() AND message_id_external = '0') as schedule_messages_count,
       (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
     FROM clients_chats_opened cco
     INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
@@ -278,7 +279,7 @@ final class ChatRepository
         AND invitations_accept > 0 
         AND invitations_finish = 0
       )
-      ORDER BY cm.message_created DESC
+      ORDER BY cm.message_created DESC, cm.message_id ASC
       LIMIT {$limit}
     ");
     $fetch = $stmt->fetchAll();
@@ -647,10 +648,10 @@ final class ChatRepository
 
       if ($text != "" && $messageExternalId !== null) {
         $stmt = $pdo->prepare("
-          INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, schedule_message) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id']]);
+        $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id'], ($scheduleDate != 0 ? time() : '0')]);
       }
 
       $index = 0;
@@ -673,10 +674,10 @@ final class ChatRepository
 
           if ($messageExternalId !== null) {
             $stmt = $pdo->prepare("
-              INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, message_type) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, message_type, schedule_message) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $filePath, $lastChat['device_id'], '1']);
+            $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $filePath, $lastChat['device_id'], '1', ($scheduleDate != 0 ? time() : '0')]);
           }
 
           $index++;
