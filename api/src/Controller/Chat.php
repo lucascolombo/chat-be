@@ -7,6 +7,7 @@ use Pimple\Psr11\Container;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use App\Repository\ChatRepository;
 use App\Repository\UserRepository;
+use Slim\Routing\RouteContext;
 use App\Lib\Encrypt;
 
 final class Chat
@@ -39,5 +40,56 @@ final class Chat
         $chatRepository = new ChatRepository($this->container);
 
         return $response->withJson($chatRepository->getChats($company, $limit, $search, $nao_lido, $setor, $status, $tag, $user, $userId));
+    }
+
+    public function getScheduleMessages(Request $request, Response $response): Response
+    {
+        $message = [ 'success' => false ];
+
+        $userRepository = new UserRepository($this->container);                                                                                
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $id = $route->getArgument('id');
+
+        $chatRepository = new ChatRepository($this->container);
+
+        return $response->withJson($chatRepository->getAllScheduledMessages($id, $userId));
+    }
+
+    public function sendScheduleMessage(Request $request, Response $response): Response
+    {
+        $message = [ 'success' => false ];
+
+        $userRepository = new UserRepository($this->container);                                                                                
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $id = $route->getArgument('id');
+
+        $chatRepository = new ChatRepository($this->container);
+
+        return $response->withJson($chatRepository->sendScheduleMessage($id, $userId));
+    }
+
+    public function deleteScheduleMessage(Request $request, Response $response): Response
+    {
+        $message = [ 'success' => false ];
+
+        $userRepository = new UserRepository($this->container);                                                                                
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $id = $route->getArgument('id');
+
+        $chatRepository = new ChatRepository($this->container);
+
+        return $response->withJson($chatRepository->deleteScheduleMessage($id, $userId));
     }
 }

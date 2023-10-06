@@ -211,8 +211,8 @@ final class ChatRepository
       IF(cco.chat_standby = '$userId', 1, 0) as queue_is_mine,
       (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
       (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
-      (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND schedule_message > 0 AND message_created > UNIX_TIMESTAMP() AND message_id_external = '0') as schedule_messages_count,
-      (SELECT COUNT(*) FROM clients_messages cm WHERE cm.chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
+      (SELECT COUNT(*) FROM clients_messages WHERE client_id = cco.client_id AND schedule_message > 0 AND message_created > UNIX_TIMESTAMP() AND message_id_external = '0' AND schedule_DeletedBy = '0' AND schedule_SentEarly = '0') as schedule_messages_count,
+      (SELECT COUNT(*) FROM clients_messages WHERE chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
     FROM clients_chats_opened cco
     INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
     {$tag_query}
@@ -694,6 +694,84 @@ final class ChatRepository
 
       $message["success"] = true;
     }
+
+    return $message;
+  }
+
+  public function getAllScheduledMessages($id, $userId) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->query("
+      SELECT * FROM clients_messages cm
+      INNER JOIN employee_details ed ON ed.employee_id = cm.who_sent
+      WHERE cm.client_id = '$id'
+      AND cm.schedule_message > 0 
+      AND cm.message_created > UNIX_TIMESTAMP() 
+      AND cm.message_id_external = '0'
+      AND cm.schedule_DeletedBy = '0'
+      AND cm.schedule_SentEarly = '0'
+      AND cm.company_id IN (
+        SELECT invitations_company_id
+        FROM company_invitations 
+        WHERE invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      )
+      ORDER BY cm.schedule_message ASC
+    ");
+    $fetch = $stmt->fetchAll();
+    $arr = [];
+
+    foreach ($fetch as $single) {
+      $element = $single;
+      // message_created é a data em que a mensagem vai entrar no chat então é a data agendada
+      // schedule_message é a data em que o agendamento foi criado apenas para diferenciar de 0 e registrar
+      $element["datetime_schedule"] = date("d/m/Y H:i:s", $element["message_created"]);
+      $element["datetime"] = date("d/m/Y H:i:s", $element["schedule_message"]);
+      $arr[] = $element;
+    }
+
+    $message = [ 'success' => true, 'messages' => $arr ];
+
+    return $message;
+  }
+
+  public function sendScheduleMessage($id, $userId) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->prepare("
+      UPDATE clients_messages as cm
+      INNER JOIN company_invitations ci ON ci.invitations_company_id = cm.company_id AND ci.invitations_employee_id = ?
+      SET cm.message_created = UNIX_TIMESTAMP(),
+      cm.schedule_SentEarly = ?
+      WHERE cm.message_id = ?
+    ");
+    $stmt->execute([$userId, $userId, $id]);
+
+    $message["success"] = true;
+
+    return $message;
+  }
+
+  public function deleteScheduleMessage($id, $userId) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->prepare("
+      UPDATE clients_messages as cm
+      INNER JOIN company_invitations ci ON ci.invitations_company_id = cm.company_id AND ci.invitations_employee_id = ?
+      SET cm.message_deleted_date = UNIX_TIMESTAMP(),
+      cm.schedule_DeletedBy = ?
+      WHERE cm.message_id = ?
+    ");
+    $stmt->execute([$userId, $userId, $id]);
+
+    $message["success"] = true;
 
     return $message;
   }
