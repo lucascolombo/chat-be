@@ -84,6 +84,7 @@ class SendMedia {
       elseif (strpos($extension, 'amr') !== false) {$MediaType = "audio";}
       elseif (strpos($extension, 'mpeg') !== false) {$MediaType = "audio";}
       elseif (strpos($extension, 'ogg') !== false) {$MediaType = "audio";}
+      elseif (strpos($extension, 'jpeg') !== false) {$MediaType = "image";}
       elseif (strpos($extension, 'jpg') !== false) {$MediaType = "image";}
       elseif (strpos($extension, 'png') !== false) {$MediaType = "image";}
       elseif (strpos($extension, 'mp4') !== false) {$MediaType = "video";}
