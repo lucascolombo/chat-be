@@ -92,4 +92,24 @@ final class Chat
 
         return $response->withJson($chatRepository->deleteScheduleMessage($id, $userId));
     }
+
+    public function newChat(Request $request, Response $response): Response
+    {
+        $message = [ 'success' => false ];
+
+        $userRepository = new UserRepository($this->container);                                                                                
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        $body = $request->getParsedBody();
+        $name = array_key_exists("name", $body) ? $body["name"] : "";
+        $phone = array_key_exists("phone", $body) ? $body["phone"] : "";
+        $country = array_key_exists("country", $body) ? $body["country"] : "";
+        $setor = array_key_exists("setor", $body) ? $body["setor"] : "";
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $chatRepository = new ChatRepository($this->container);
+
+        return $response->withJson($chatRepository->newChat($companyId, $name, $phone, $country, $setor, $userId));
+    }
 }

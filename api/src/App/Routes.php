@@ -52,6 +52,7 @@ $app->get('/company/{id}', 'App\Controller\Company:getCompanyData')->add(Auth::c
 $app->get('/schedule-messages/{id}', 'App\Controller\Chat:getScheduleMessages')->add(Auth::class)->setName('scheduleMessages');
 $app->post('/send-schedule-message/{id}', 'App\Controller\Chat:sendScheduleMessage')->add(Auth::class)->setName('sendScheduleMessages');
 $app->post('/delete-schedule-message/{id}', 'App\Controller\Chat:deleteScheduleMessage')->add(Auth::class)->setName('deleteScheduleMessages');
+$app->post('/message/new', 'App\Controller\Chat:newChat')->add(Auth::class)->setName('newChat');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

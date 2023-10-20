@@ -776,4 +776,100 @@ final class ChatRepository
 
     return $message;
   }
+
+  public function newChat($companyId, $name, $phone, $country, $setor, $userId) {
+    $message = [ 'success' => false ];
+
+    if (
+        $companyId &&
+        $name !== "" && 
+        $phone !== "" && 
+        $country !== "" && 
+        $setor !== ""
+      ) {
+      $pdo = $this->container->get('db');
+      $client_phone = $country . $phone;
+      $mensagem_log = "";
+
+      $stmt = $pdo->query("
+        SELECT employee_name
+        FROM employee_details
+        WHERE employee_id = '$userId'
+      ");
+      $employee = $stmt->fetch();
+      $usuario = $employee['employee_name'];
+
+      // TODO: add column device_id for serach per device in the future
+      $stmt = $pdo->query("
+        SELECT *, count(*) as c FROM clients_registered_details
+        WHERE client_phone = '$client_phone'
+        AND company_id = '$companyId'
+        AND company_id IN (
+          SELECT invitations_company_id
+          FROM company_invitations 
+          WHERE invitations_employee_id = '$userId'
+          AND invitations_accept > 0 
+          AND invitations_finish = 0
+        )
+      ");
+      $client = $stmt->fetch();
+
+      if ($client['c'] == 0) {
+        // TODO: get device id from body
+        $device_id = "5";
+
+        $stmt = $pdo->prepare("
+          INSERT INTO clients_registered_details (client_phone, client_name, company_id, device_id) 
+          VALUES (?, ?, ?, ?)
+        ");
+        $stmt->execute([$client_phone, $name, $companyId, $device_id]);
+        $newChatId = $pdo->lastInsertId();
+        $client_id = $newChatId;
+
+        $mensagem_log = "Cliente Cadastrado por $usuario.";
+      }
+      else {
+        $client_id = $client['client_id'];
+        $device_id = $client['device_id'];
+
+        $mensagem_log = "$usuario tentou cadastrar este cliente novamente.";
+      }
+
+      $stmt = $pdo->query("
+        SELECT *, count(*) as c
+        FROM clients_chats_opened cco
+        WHERE cco.chat_date_close = 0
+        AND cco.chat_date_start > 0
+        AND cco.company_id = '$companyId'
+        AND cco.client_phone = '$client_phone'
+        ORDER BY cco.chat_id DESC
+        LIMIT 1
+      ");
+      $lastChat = $stmt->fetch();
+      $lastChatId = $lastChat["chat_id"];
+
+      if ($lastChat['c'] > 0) {
+        $message['clientId'] = $client_id;
+      }
+      else {
+        $stmt = $pdo->prepare("
+          INSERT INTO clients_chats_opened (who_start, company_id, device_id, client_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, ura_status) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute(["1", $companyId, $device_id, $client_id, $client_phone, time(), $setor, $userId, "1"]);
+        $message['clientId'] = $client_id;
+        $lastChatId = $pdo->lastInsertId();
+      }
+
+      $stmt = $pdo->prepare("
+        INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ");
+      $stmt->execute([$lastChatId, $client_id, $client_phone, $companyId, $setor, $userId, 'SENT-DEVICE', time(), time(), $mensagem_log, $device_id, '1']);
+
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
 }
