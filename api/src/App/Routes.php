@@ -33,6 +33,7 @@ $app->get('/', 'App\Controller\Home:home')->setName('home');
 $app->post('/auth', 'App\Controller\Home:doLogin')->setName('login');
 $app->get('/file/{id}/{filename}', 'App\Controller\File:getFile')->setName('getFile');
 $app->get('/chats', 'App\Controller\Chat:getChats')->add(Auth::class)->setName('chats');
+$app->get('/chat/{id}', 'App\Controller\Chat:getSingleChat')->add(Auth::class)->setName('getSingleChat');
 $app->get('/companies', 'App\Controller\Company:getUserCompanies')->add(Auth::class)->setName('companies');
 $app->get('/filter/{id}', 'App\Controller\Company:getCompanyFiltersOptions')->add(Auth::class)->setName('filter');
 $app->get('/messages/{id}/{companyId}', 'App\Controller\Messages:getMessages')->add(Auth::class)->setName('messages');
@@ -47,6 +48,7 @@ $app->post('/client/{id}/finish', 'App\Controller\Client:finish')->add(Auth::cla
 $app->post('/messages/{id}/transfer-setor', 'App\Controller\Messages:transferSetor')->add(Auth::class)->setName('transferSetor');
 $app->post('/messages/{id}/transfer-user', 'App\Controller\Messages:transferUser')->add(Auth::class)->setName('transferUser');
 $app->post('/messages/{id}/send-message', 'App\Controller\Messages:sendMessage')->add(Auth::class)->setName('sendMessage');
+$app->post('/messages/{id}/send-whatsapp', 'App\Controller\Messages:sendMessageWhatsapp')->add(Auth::class)->setName('sendMessageWhatsapp');
 $app->post('/messages/{id}/read', 'App\Controller\Messages:read')->add(Auth::class)->setName('read');
 $app->get('/company/{id}', 'App\Controller\Company:getCompanyData')->add(Auth::class)->setName('company');
 $app->get('/schedule-messages/{id}', 'App\Controller\Chat:getScheduleMessages')->add(Auth::class)->setName('scheduleMessages');

@@ -89,8 +89,7 @@ final class ClientRepository
         SELECT *
         FROM clients_chats_opened cco
         INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
-        WHERE cco.chat_date_close = 0
-        AND crd.client_id = '$id'
+        WHERE crd.client_id = '$id'
         ORDER BY cco.chat_id DESC
         LIMIT 1
       ");
@@ -101,7 +100,8 @@ final class ClientRepository
       $stmt = $pdo->prepare("
         UPDATE clients_chats_opened as cco
         INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
-        SET cco.chat_date_close = ?
+        SET cco.chat_date_close = ?,
+        chat_last_message_add = '$datetime'
         WHERE cco.chat_date_close = 0
         AND crd.client_id = ?
       ");

@@ -42,6 +42,7 @@ class SendSimpleText {
         CURLOPT_CUSTOMREQUEST => "POST",
         CURLOPT_POSTFIELDS => $data,
         CURLOPT_HTTPHEADER => array(
+          "client-token: F10e75314314549299f7236a6f2ac8c5fS",
           "content-type: application/json"
         ),
         CURLOPT_SSL_VERIFYPEER => false,
@@ -118,7 +119,8 @@ class SendMedia {
         CURLOPT_CUSTOMREQUEST => "POST",
         CURLOPT_POSTFIELDS => $data,
         CURLOPT_HTTPHEADER => array(
-          "Content-Type: application/json"
+          "client-token: F10e75314314549299f7236a6f2ac8c5fS",
+          "content-Type: application/json"
         ),
       ));
   
@@ -208,6 +210,7 @@ final class ChatRepository
       crd.employee_fixed_max_date,
       cco.chat_standby as queue,
       cco.chat_employee_id,
+      cco.chat_date_close,
       IF(cco.chat_employee_id = '$userId', 1, 0) as chat_is_mine,
       IF(cco.chat_standby = '$userId', 1, 0) as queue_is_mine,
       (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
@@ -230,6 +233,7 @@ final class ChatRepository
       AND invitations_accept > 0 
       AND invitations_finish = 0
     )
+    GROUP BY cco.client_id
     ORDER BY chat_last_message_add DESC
     LIMIT {$limit}
   ";
@@ -245,6 +249,50 @@ final class ChatRepository
     }
 
     $message = [ 'success' => true, 'chats' => $arr, 'company'=> $company, 'query' => $query ];
+
+    return $message;
+  }
+
+  public function getSingleChat($id, $userId) {
+    $message = [ 'success' => false, 'chat' => [] ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT 
+        cco.chat_id as id,
+        cco.client_id,
+        IF(crd.client_name = '', cco.client_phone, crd.client_name) as exhibition_name,
+        cco.client_phone,
+        crd.client_avatar as avatar,
+        cco.chat_last_message_add as last_time,
+        crd.department_fixed,
+        crd.employee_fixed,
+        crd.employee_fixed_max_date,
+        cco.chat_standby as queue,
+        cco.chat_employee_id,
+        cco.chat_date_close,
+        IF(cco.chat_employee_id = '$userId', 1, 0) as chat_is_mine,
+        IF(cco.chat_standby = '$userId', 1, 0) as queue_is_mine,
+        (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
+        (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
+        (SELECT COUNT(*) FROM clients_messages WHERE client_id = cco.client_id AND schedule_message > 0 AND message_created > UNIX_TIMESTAMP() AND message_id_external = '0' AND schedule_DeletedBy = '0' AND schedule_SentEarly = '0') as schedule_messages_count,
+        (SELECT COUNT(*) FROM clients_messages WHERE chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
+      FROM clients_chats_opened cco
+      INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+      WHERE cco.client_id = '$id'
+      AND cco.company_id IN (
+        SELECT invitations_company_id
+        FROM company_invitations 
+        WHERE invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      )
+      ORDER BY cco.chat_id DESC
+      LIMIT 1
+    ");
+    $chat = $stmt->fetch();
+
+    $message = [ 'success' => true, 'chat' => $chat ];
 
     return $message;
   }
@@ -292,6 +340,7 @@ final class ChatRepository
       $element["datetime"] = date("d/m/Y H:i:s", $element["message_created"]);
       $element["datetime_deleted"] = date("d/m/Y H:i:s", $element["message_deleted_date"]);
       $element["datetime_edited"] = date("d/m/Y H:i:s", $element["message_edited_date"]);
+      //$element["message"] = utf8mb4_encode($element["message"]);
       $arr[] = $element;
     }
 
@@ -600,10 +649,58 @@ final class ChatRepository
     return $message;
   }
 
+  public function sendMessageWhatsapp($messageId, $id, $userId, $companyId, $text) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+    $datetime = time();
+
+    $stmt = $pdo->query("
+      SELECT *
+      FROM clients_chats_opened cco
+      INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+      INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = '$userId'
+      WHERE cco.chat_date_close = 0
+      AND crd.client_id = '$id'
+      AND ci.invitations_company_id = '$companyId'
+      AND ci.invitations_employee_id = '$userId'
+      ORDER BY cco.chat_id DESC
+      LIMIT 1
+    ");
+    $lastChat = $stmt->fetch();
+    $device_id = $lastChat["device_id"];
+    $phone = $lastChat['client_phone'];
+
+    $stmt = $pdo->query("
+      SELECT 
+        device_login as instancia, 
+        device_pass as token,
+        device_status as status
+      FROM company_devices WHERE device_id = '$device_id' 
+    ");
+    $device = $stmt->fetch();
+    $instancia = $device["instancia"];
+    $token = $device["token"];
+
+    $sender = new SendSimpleText($instancia, $token, $phone, $text, "");
+    $messageExternalId = $sender->send();
+
+    $stmt = $pdo->prepare("
+      UPDATE clients_messages
+      SET message_id_external = ? 
+      WHERE message_id = ?
+    ");
+    $stmt->execute([$messageExternalId, $messageId]);
+
+    $message['success'] = true;
+
+    return $message;
+  }
+
   public function sendMessage($id, $userId, $companyId, $text, $scheduleDate, $files) {
     $dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/' . $id;
 
-    $message = [ 'success' => false, "files" => [] ];
+    $message = [ 'success' => false, "message" => 0 ];
 
     if (!file_exists($dir)) {
       mkdir($dir, 0777, true);
@@ -641,18 +738,13 @@ final class ChatRepository
       $token = $device["token"];
       $status = $device["status"];
 
-      if ($scheduleDate == 0 && $status == 0) {
-        $sender = new SendSimpleText($instancia, $token, $phone, $text, "");
-        $messageExternalId = $sender->send();
-      }
-      else $messageExternalId = 0;
-
-      if ($text != "" && $messageExternalId !== null) {
+      if (trim($text) != "") {
         $stmt = $pdo->prepare("
           INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, schedule_message) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id'], ($scheduleDate != 0 ? time() : '0')]);
+        $stmt->execute([$lastChat["chat_id"], '0', $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id'], ($scheduleDate != 0 ? time() : '0')]);
+        $message["message"] = $scheduleDate == 0 && $status == 0 ? $pdo->lastInsertId() : 0;
       }
 
       $index = 0;
@@ -816,7 +908,7 @@ final class ChatRepository
 
       if ($client['c'] == 0) {
         // TODO: get device id from body
-        $device_id = "5";
+        $device_id = "9";
 
         $stmt = $pdo->prepare("
           INSERT INTO clients_registered_details (client_phone, client_name, company_id, device_id) 

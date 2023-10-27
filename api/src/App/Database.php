@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 $container['db'] = static function (): PDO {
     $dsn = sprintf(
-        'mysql:host=%s;dbname=%s;port=%s;charset=utf8',
+        'mysql:host=%s;dbname=%s;port=%s;charset=utf8mb4',
         $_SERVER['DB_HOST'],
         $_SERVER['DB_NAME'],
         $_SERVER['DB_PORT']

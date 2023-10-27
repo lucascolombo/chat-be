@@ -42,6 +42,23 @@ final class Chat
         return $response->withJson($chatRepository->getChats($company, $limit, $search, $nao_lido, $setor, $status, $tag, $user, $userId));
     }
 
+    public function getSingleChat(Request $request, Response $response): Response
+    {
+        $message = [ 'success' => false ];
+
+        $userRepository = new UserRepository($this->container);                                                                                
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $id = $route->getArgument('id');
+
+        $chatRepository = new ChatRepository($this->container);
+
+        return $response->withJson($chatRepository->getSingleChat($id, $userId));
+    }
+
     public function getScheduleMessages(Request $request, Response $response): Response
     {
         $message = [ 'success' => false ];
