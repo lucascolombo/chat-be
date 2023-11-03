@@ -59,6 +59,33 @@ final class Chat
         return $response->withJson($chatRepository->getSingleChat($id, $userId));
     }
 
+    public function updateChatStatus(Request $request, Response $response): Response
+    {
+        $message = [ 'success' => false ];
+
+        $userRepository = new UserRepository($this->container);                                                                                
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $chatId = $route->getArgument('id');
+
+        $body = $request->getParsedBody();
+        $status = array_key_exists("status", $body) ? $body["status"] : "1";
+        $abort = array_key_exists("abort", $body) ? $body["abort"] : "1";
+        $statusLabel = array_key_exists("statusLabel", $body) ? $body["statusLabel"] : ( $status == 1 ? "" : "Adiado" );
+        $statusDateValidity = array_key_exists("statusDateValidity", $body) ? $body["statusDateValidity"] : ($status == 1 ? "0" : time());
+        $endMessage = array_key_exists("endMessage", $body) ? $body["endMessage"] : "";
+        $telefone = array_key_exists("telefone", $body) ? $body["telefone"] : "0";
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : "0";
+        $deviceId = array_key_exists("deviceId", $body) ? $body["deviceId"] : "0";
+
+        $chatRepository = new ChatRepository($this->container);
+
+        return $response->withJson($chatRepository->updateChatStatus($chatId, $userId, $status, $abort, $statusLabel, $statusDateValidity, $endMessage, $telefone, $companyId, $deviceId));
+    }
+
     public function getScheduleMessages(Request $request, Response $response): Response
     {
         $message = [ 'success' => false ];

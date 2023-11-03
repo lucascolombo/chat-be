@@ -34,6 +34,7 @@ $app->post('/auth', 'App\Controller\Home:doLogin')->setName('login');
 $app->get('/file/{id}/{filename}', 'App\Controller\File:getFile')->setName('getFile');
 $app->get('/chats', 'App\Controller\Chat:getChats')->add(Auth::class)->setName('chats');
 $app->get('/chat/{id}', 'App\Controller\Chat:getSingleChat')->add(Auth::class)->setName('getSingleChat');
+$app->post('/chat/{id}/status', 'App\Controller\Chat:updateChatStatus')->add(Auth::class)->setName('updateChatStatus');
 $app->get('/companies', 'App\Controller\Company:getUserCompanies')->add(Auth::class)->setName('companies');
 $app->get('/filter/{id}', 'App\Controller\Company:getCompanyFiltersOptions')->add(Auth::class)->setName('filter');
 $app->get('/messages/{id}/{companyId}', 'App\Controller\Messages:getMessages')->add(Auth::class)->setName('messages');

@@ -263,6 +263,7 @@ final class ChatRepository
         cco.client_id,
         IF(crd.client_name = '', cco.client_phone, crd.client_name) as exhibition_name,
         cco.client_phone,
+        cco.device_id,
         crd.client_avatar as avatar,
         cco.chat_last_message_add as last_time,
         crd.department_fixed,
@@ -276,9 +277,15 @@ final class ChatRepository
         (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
         (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
         (SELECT COUNT(*) FROM clients_messages WHERE client_id = cco.client_id AND schedule_message > 0 AND message_created > UNIX_TIMESTAMP() AND message_id_external = '0' AND schedule_DeletedBy = '0' AND schedule_SentEarly = '0') as schedule_messages_count,
-        (SELECT COUNT(*) FROM clients_messages WHERE chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
+        (SELECT COUNT(*) FROM clients_messages WHERE chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count,
+        ccs.status_type,
+        ccs.status_label,
+        ccs.status_date_validity,
+        ccs.status_message_toEndChat,
+        ccs.status_abortIFmessageReceived
       FROM clients_chats_opened cco
       INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+      LEFT JOIN clients_chats_status ccs ON ccs.status_chat_id = cco.chat_id AND ccs.status_date_finished = 0
       WHERE cco.client_id = '$id'
       AND cco.company_id IN (
         SELECT invitations_company_id
@@ -961,6 +968,37 @@ final class ChatRepository
 
       $message["success"] = true;
     }
+
+    return $message;
+  }
+
+  private function CloseLastStatus($chat_id) {
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->prepare("
+      UPDATE clients_chats_status 
+      SET status_date_finished = UNIX_TIMESTAMP(),
+      status_finished_reason = '2'
+      WHERE status_date_finished = 0
+      AND status_chat_id = ?
+    ");
+    
+    $stmt->execute([$chat_id]);
+  }
+
+  public function updateChatStatus($chatId, $userId, $status, $abort, $statusLabel, $statusDateValidity, $endMessage, $telefone, $companyId, $deviceId) {
+    $message = [ 'success' => false ];
+
+    $this->CloseLastStatus($chatId);
+
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->prepare("
+      INSERT INTO clients_chats_status (status_date_created, status_abortIFmessageReceived, status_IDuser_created, status_type, status_label, status_date_validity, status_message_toEndChat, status_message_destiny, status_chat_id, status_company_id, status_device_id) 
+      VALUES (UNIX_TIMESTAMP(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->execute([$abort, $userId, $status, $statusLabel, $statusDateValidity, $endMessage, $telefone, $chatId, $companyId, $deviceId]);
+
 
     return $message;
   }
