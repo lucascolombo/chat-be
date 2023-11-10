@@ -65,6 +65,11 @@ final class ClientRepository
       ");
       $stmt->execute([$lastChat['chat_id'], $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, $datetime, "Atendimento Finalizado por $usuario", $lastChat['device_id'], '1']);
       
+      $standBy = $lastChat['chat_standby'];
+
+      if ($standBy != '0')
+        $this->start($id, $companyId, $standBy);
+
       $message["success"] = true;
     }
 
@@ -95,7 +100,7 @@ final class ClientRepository
       ");
       $lastChat = $stmt->fetch();
 
-      $datetime = time();
+      $datetime = time() + 1;
 
       $stmt = $pdo->prepare("
         UPDATE clients_chats_opened as cco
@@ -108,10 +113,10 @@ final class ClientRepository
       $stmt->execute([$datetime, $id]);
 
       $stmt = $pdo->prepare("
-        INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who, ura_status) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ");
-      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $lastChat['chat_department_id'], $userId, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who']]);
+      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $lastChat['chat_department_id'], $userId, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who'], '1']);
 
       $newChatId = $pdo->lastInsertId();
 

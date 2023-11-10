@@ -210,15 +210,20 @@ final class ChatRepository
       crd.employee_fixed_max_date,
       cco.chat_standby as queue,
       cco.chat_employee_id,
+      cco.chat_date_start,
       cco.chat_date_close,
       IF(cco.chat_employee_id = '$userId', 1, 0) as chat_is_mine,
       IF(cco.chat_standby = '$userId', 1, 0) as queue_is_mine,
       (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
       (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
       (SELECT COUNT(*) FROM clients_messages WHERE client_id = cco.client_id AND schedule_message > 0 AND message_created > UNIX_TIMESTAMP() AND message_id_external = '0' AND schedule_DeletedBy = '0' AND schedule_SentEarly = '0') as schedule_messages_count,
-      (SELECT COUNT(*) FROM clients_messages WHERE chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count
+      (SELECT COUNT(*) FROM clients_messages WHERE chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count,
+      ccs.status_type,
+      ccs.status_label,
+      ccs.status_date_validity
     FROM clients_chats_opened cco
     INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+    LEFT JOIN clients_chats_status ccs ON ccs.status_chat_id = cco.chat_id AND ccs.status_date_finished = 0
     {$tag_query}
     WHERE cco.company_id = '$company'
     {$search_query}
@@ -391,6 +396,11 @@ final class ChatRepository
     if ($assignedUserId !== null && $assignedDate !== null) {
       $pdo = $this->container->get('db');
 
+      if ($assignedUserId === '') {
+        $assignedUserId = '0';
+        $assignedDate = '0';
+      }
+
       $stmt = $pdo->prepare("
         UPDATE clients_registered_details as crd
         INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = ?
@@ -412,6 +422,10 @@ final class ChatRepository
     if ($assignedSetorId !== null) {
       $pdo = $this->container->get('db');
 
+      if ($assignedSetorId === '') {
+        $assignedSetorId = '0';
+      }
+
       $stmt = $pdo->prepare("
         UPDATE clients_registered_details as crd
         INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = ?
@@ -425,6 +439,29 @@ final class ChatRepository
     }
 
     return $message;
+  }
+
+  public function insertSystemLogByChatId($chatId, $message) {
+    $pdo = $this->container->get('db');
+
+    $datetime = time() + 1;
+
+    $stmt = $pdo->query("
+      SELECT * FROM clients_chats_opened WHERE chat_id = '$chatId'
+    ");
+    $lastChat = $stmt->fetch();
+    $clientId = $lastChat['client_id'];
+    $client_phone = $lastChat['client_phone'];
+    $company_id = $lastChat['company_id'];
+    $department_id = $lastChat['chat_department_id'];
+    $device_id = $lastChat['device_id'];
+    $who_sent = $lastChat['chat_standby'];
+
+    $stmt = $pdo->prepare("
+      INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->execute([$chatId, $clientId, $client_phone, $company_id, $department_id, $who_sent, 'SENT-DEVICE', $datetime, $datetime, $message, $device_id, '1']);
   }
 
   public function addToQueue($id, $userId, $companyId) {
@@ -441,6 +478,16 @@ final class ChatRepository
         AND cco.chat_id = ?
       ");
       $stmt->execute([$userId, $userId, $companyId, $id]);
+
+      $stmt = $pdo->query("
+        SELECT employee_name
+        FROM employee_details
+        WHERE employee_id = '$userId'
+      ");
+      $employee = $stmt->fetch();
+      $usuario = $employee['employee_name'];
+
+      $this->insertSystemLogByChatId($id, "$usuario entrou na fila de espera.");
 
       $message["queue"] = $userId;
       $message["success"] = true;
@@ -463,6 +510,16 @@ final class ChatRepository
         AND cco.chat_id = ?
       ");
       $stmt->execute([$userId, $companyId, $id]);
+
+      $stmt = $pdo->query("
+        SELECT employee_name
+        FROM employee_details
+        WHERE employee_id = '$userId'
+      ");
+      $employee = $stmt->fetch();
+      $usuario = $employee['employee_name'];
+
+      $this->insertSystemLogByChatId($id, "$usuario saiu da fila de espera.");
 
       $message["success"] = true;
     }
@@ -519,10 +576,10 @@ final class ChatRepository
       $stmt->execute([$datetime, $id]);
 
       $stmt = $pdo->prepare("
-        INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who, ura_status) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ");
-      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $setor, $userId, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who']]);
+      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $setor, $userId, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who'], '1']);
 
       $newChatId = $pdo->lastInsertId();
 
