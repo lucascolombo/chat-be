@@ -274,6 +274,8 @@ final class ChatRepository
         crd.department_fixed,
         crd.employee_fixed,
         crd.employee_fixed_max_date,
+        (SELECT employee_name FROM employee_details WHERE employee_id = crd.employee_fixed) as employee_fixed_name,
+        (SELECT departments_name FROM company_departments WHERE departments_id = crd.department_fixed) as department_fixed_name,
         cco.chat_standby as queue,
         cco.chat_employee_id,
         cco.chat_date_close,
