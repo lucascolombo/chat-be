@@ -5,6 +5,7 @@ namespace App\Repository;
 use Pimple\Psr11\Container;
 use App\Lib\Chat;
 use Slim\Psr7\UploadedFile;
+use App\Repository\UserRepository;
 
 class SendSimpleText { 
   private $instancia; 
@@ -220,7 +221,12 @@ final class ChatRepository
       (SELECT COUNT(*) FROM clients_messages WHERE chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count,
       ccs.status_type,
       ccs.status_label,
-      ccs.status_date_validity
+      ccs.status_date_validity,
+      cco.chat_mark_unread,
+      (SELECT message_type_detail FROM clients_messages WHERE chat_id = cco.chat_id ORDER BY message_id DESC LIMIT 1) as last_message,
+      cco.chat_standby,
+      crd.department_fixed,
+      crd.employee_fixed
     FROM clients_chats_opened cco
     INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
     LEFT JOIN clients_chats_status ccs ON ccs.status_chat_id = cco.chat_id AND ccs.status_date_finished = 0
@@ -250,6 +256,7 @@ final class ChatRepository
     foreach ($fetch as $single) {
       $element = $single;
       $element["last_time"] = date("d/m H:i", $element["last_time"]);
+      $element["status_date_validity"] = date("d/m/Y H:i", $element["status_date_validity"]);
       $arr[] = $element;
     }
 
@@ -443,7 +450,7 @@ final class ChatRepository
     return $message;
   }
 
-  public function insertSystemLogByChatId($chatId, $message) {
+  public function insertSystemLogByChatId($chatId, $message, $userId) {
     $pdo = $this->container->get('db');
 
     $datetime = time() + 1;
@@ -457,13 +464,21 @@ final class ChatRepository
     $company_id = $lastChat['company_id'];
     $department_id = $lastChat['chat_department_id'];
     $device_id = $lastChat['device_id'];
-    $who_sent = $lastChat['chat_standby'];
+    $who_sent = $userId;
 
     $stmt = $pdo->prepare("
       INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([$chatId, $clientId, $client_phone, $company_id, $department_id, $who_sent, 'SENT-DEVICE', $datetime, $datetime, $message, $device_id, '1']);
+
+    $stmt = $pdo->prepare("
+      UPDATE clients_chats_opened 
+      SET chat_last_message_add = ?,
+      chat_last_message_who = ?
+      WHERE chat_id = ?
+    ");
+    $stmt->execute([$datetime, 'L', $chatId]);
   }
 
   public function addToQueue($id, $userId, $companyId) {
@@ -489,7 +504,7 @@ final class ChatRepository
       $employee = $stmt->fetch();
       $usuario = $employee['employee_name'];
 
-      $this->insertSystemLogByChatId($id, "$usuario entrou na fila de espera.");
+      $this->insertSystemLogByChatId($id, "$usuario entrou na fila de espera.", $userId);
 
       $message["queue"] = $userId;
       $message["success"] = true;
@@ -521,7 +536,7 @@ final class ChatRepository
       $employee = $stmt->fetch();
       $usuario = $employee['employee_name'];
 
-      $this->insertSystemLogByChatId($id, "$usuario saiu da fila de espera.");
+      $this->insertSystemLogByChatId($id, "$usuario saiu da fila de espera.", $userId);
 
       $message["success"] = true;
     }
@@ -672,7 +687,7 @@ final class ChatRepository
     return $filename;
   }
 
-  public function read($id, $userId, $companyId) {
+  public function read($id, $userId, $companyId, $validateUser = true) {
     $message = [ 'success' => false ];
 
     $pdo = $this->container->get('db');
@@ -691,8 +706,11 @@ final class ChatRepository
       LIMIT 1
     ");
     $lastChat = $stmt->fetch();
-
-    if ($companyId !== null) {
+    
+    if (
+      ($companyId !== null) && 
+      ($lastChat["chat_employee_id"] == $userId || $validateUser === false)
+    ) {
       $stmt = $pdo->prepare("
         UPDATE clients_chats_opened as cco
         SET cco.chat_employee_last_seen = ?
@@ -1058,6 +1076,66 @@ final class ChatRepository
     ");
     $stmt->execute([$abort, $userId, $status, $statusLabel, $statusDateValidity, $endMessage, $telefone, $chatId, $companyId, $deviceId]);
 
+
+    return $message;
+  }
+
+  public function getLastChat($id, $companyId, $userId) {
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->query("
+        SELECT *
+        FROM clients_chats_opened cco
+        INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = '$userId'
+        WHERE cco.chat_date_close = 0
+        AND crd.client_id = '$id'
+        AND ci.invitations_company_id = '$companyId'
+        AND ci.invitations_employee_id = '$userId'
+        ORDER BY cco.chat_id DESC
+        LIMIT 1
+      ");
+
+    return $stmt->fetch();
+  }
+
+  public function updateMarkUnread($chatId, $datetime) {
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->prepare("
+      UPDATE clients_chats_opened 
+      SET chat_mark_unread = ?
+      WHERE chat_id = ?
+    ");
+    $stmt->execute([$datetime, $chatId]);
+  }
+
+  public function markAsRead($id, $companyId, $userId) {
+    $message = [ 'success' => false ];
+
+    $userRepository = new UserRepository($this->container);                                                                                
+    $usuario = $userRepository->getUserNameById($userId);
+
+    $lastChat = $this->getLastChat($id, $companyId, $userId);
+    $this->insertSystemLogByChatId($lastChat["chat_id"], "$usuario marcou como lido.", $userId);
+    $this->read($id, $userId, $companyId, false);
+    $this->updateMarkUnread($lastChat["chat_id"], 0);
+
+    $message = [ 'success' => true ];
+
+    return $message;
+  }
+
+  public function markAsUnread($id, $companyId, $userId) {
+    $message = [ 'success' => false ];
+
+    $userRepository = new UserRepository($this->container);                                                                                
+    $usuario = $userRepository->getUserNameById($userId);
+
+    $lastChat = $this->getLastChat($id, $companyId, $userId);
+    $this->updateMarkUnread($lastChat["chat_id"], time());
+    $this->insertSystemLogByChatId($lastChat["chat_id"], "$usuario marcou como não lido.", $userId);
+
+    $message = [ 'success' => true ];
 
     return $message;
   }

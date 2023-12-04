@@ -56,6 +56,8 @@ $app->get('/schedule-messages/{id}', 'App\Controller\Chat:getScheduleMessages')-
 $app->post('/send-schedule-message/{id}', 'App\Controller\Chat:sendScheduleMessage')->add(Auth::class)->setName('sendScheduleMessages');
 $app->post('/delete-schedule-message/{id}', 'App\Controller\Chat:deleteScheduleMessage')->add(Auth::class)->setName('deleteScheduleMessages');
 $app->post('/message/new', 'App\Controller\Chat:newChat')->add(Auth::class)->setName('newChat');
+$app->post('/chat/{id}/markAsRead', 'App\Controller\Chat:markAsRead')->add(Auth::class)->setName('markAsRead');
+$app->post('/chat/{id}/markAsUnread', 'App\Controller\Chat:markAsUnread')->add(Auth::class)->setName('markAsUnread');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

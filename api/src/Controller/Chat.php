@@ -156,4 +156,44 @@ final class Chat
 
         return $response->withJson($chatRepository->newChat($companyId, $name, $phone, $country, $setor, $userId));
     }
+
+    public function markAsRead(Request $request, Response $response): Response
+    {
+        $message = [ 'success' => false ];
+
+        $userRepository = new UserRepository($this->container);                                                                                
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $id = $route->getArgument('id');
+
+        $body = $request->getParsedBody();
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : "0";
+
+        $chatRepository = new ChatRepository($this->container);
+
+        return $response->withJson($chatRepository->markAsRead($id, $companyId, $userId));
+    }
+
+    public function markAsUnread(Request $request, Response $response): Response
+    {
+        $message = [ 'success' => false ];
+
+        $userRepository = new UserRepository($this->container);                                                                                
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $id = $route->getArgument('id');
+
+        $body = $request->getParsedBody();
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : "0";
+
+        $chatRepository = new ChatRepository($this->container);
+
+        return $response->withJson($chatRepository->markAsUnread($id, $companyId, $userId));
+    }
 }

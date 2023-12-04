@@ -66,5 +66,17 @@ final class UserRepository
     }
     
     return $user;
-  }    
+  }
+
+  public function getUserNameById($userId) {
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT employee_name
+      FROM employee_details
+      WHERE employee_id = '$userId'
+    ");
+    $employee = $stmt->fetch();
+    
+    return $employee['employee_name'];
+  }
 }
