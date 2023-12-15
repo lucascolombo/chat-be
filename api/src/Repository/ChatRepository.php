@@ -86,6 +86,7 @@ class SendMedia {
       elseif (strpos($extension, 'amr') !== false) {$MediaType = "audio";}
       elseif (strpos($extension, 'mpeg') !== false) {$MediaType = "audio";}
       elseif (strpos($extension, 'ogg') !== false) {$MediaType = "audio";}
+      elseif (strpos($extension, 'webm') !== false) {$MediaType = "audio";}
       elseif (strpos($extension, 'jpeg') !== false) {$MediaType = "image";}
       elseif (strpos($extension, 'jpg') !== false) {$MediaType = "image";}
       elseif (strpos($extension, 'png') !== false) {$MediaType = "image";}
@@ -223,7 +224,8 @@ final class ChatRepository
       ccs.status_label,
       ccs.status_date_validity,
       cco.chat_mark_unread,
-      (SELECT message_type_detail FROM clients_messages WHERE chat_id = cco.chat_id ORDER BY message_id DESC LIMIT 1) as last_message,
+      (SELECT message_type_detail FROM clients_messages WHERE chat_id = cco.chat_id AND message_deleted_date = 0 AND message_created <= UNIX_TIMESTAMP() ORDER BY message_id DESC LIMIT 1) as last_message,
+      (SELECT message_type FROM clients_messages WHERE chat_id = cco.chat_id AND message_deleted_date = 0 AND message_created <= UNIX_TIMESTAMP() ORDER BY message_id DESC LIMIT 1) as last_message_type,
       cco.chat_standby,
       crd.department_fixed,
       crd.employee_fixed
@@ -285,6 +287,8 @@ final class ChatRepository
         (SELECT departments_name FROM company_departments WHERE departments_id = crd.department_fixed) as department_fixed_name,
         cco.chat_standby as queue,
         cco.chat_employee_id,
+        (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_employee_id) as chat_employee_name,
+        (SELECT employee_online_status FROM employee_details WHERE employee_id = cco.chat_employee_id) as chat_employee_online_status,
         cco.chat_date_close,
         IF(cco.chat_employee_id = '$userId', 1, 0) as chat_is_mine,
         IF(cco.chat_standby = '$userId', 1, 0) as queue_is_mine,
@@ -693,6 +697,13 @@ final class ChatRepository
     $pdo = $this->container->get('db');
     $datetime = time();
 
+    $stmt = $pdo->prepare("
+        UPDATE employee_details 
+        SET employee_online_status = ?
+        WHERE employee_id = ?
+      ");
+      $stmt->execute([time(), $userId]);
+
     $stmt = $pdo->query("
       SELECT *
       FROM clients_chats_opened cco
@@ -726,6 +737,8 @@ final class ChatRepository
         AND who_sent = 0
       ");
       $stmt->execute([$datetime, $lastChat["chat_id"]]);
+
+      $this->updateMarkUnread($lastChat["chat_id"], 0);
 
       $message["success"] = true;
     }
