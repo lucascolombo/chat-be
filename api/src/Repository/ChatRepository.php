@@ -290,6 +290,7 @@ final class ChatRepository
         (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_employee_id) as chat_employee_name,
         (SELECT employee_online_status FROM employee_details WHERE employee_id = cco.chat_employee_id) as chat_employee_online_status,
         cco.chat_date_close,
+        cco.chat_date_start,
         IF(cco.chat_employee_id = '$userId', 1, 0) as chat_is_mine,
         IF(cco.chat_standby = '$userId', 1, 0) as queue_is_mine,
         (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
@@ -326,6 +327,13 @@ final class ChatRepository
     $message = [ 'success' => false ];
 
     $pdo = $this->container->get('db');
+
+    $stmt = $pdo->prepare("
+      UPDATE employee_details 
+      SET employee_online_status = ?
+      WHERE employee_id = ?
+    ");
+    $stmt->execute([time(), $userId]);
 
     $datetime = time();
 
@@ -697,13 +705,6 @@ final class ChatRepository
     $pdo = $this->container->get('db');
     $datetime = time();
 
-    $stmt = $pdo->prepare("
-        UPDATE employee_details 
-        SET employee_online_status = ?
-        WHERE employee_id = ?
-      ");
-      $stmt->execute([time(), $userId]);
-
     $stmt = $pdo->query("
       SELECT *
       FROM clients_chats_opened cco
@@ -742,6 +743,43 @@ final class ChatRepository
 
       $message["success"] = true;
     }
+
+    return $message;
+  }
+
+  private function hasSystemLog($chatId, $userId) {
+    $pdo = $this->container->get('db');
+    $stm = $pdo->prepare(
+      "SELECT chat_id 
+      FROM clients_messages 
+      WHERE chat_id = :chat_id 
+      AND who_sent = :who_sent 
+      AND system_log >= 1 
+      AND message_created >= UNIX_TIMESTAMP() - 300"
+    );
+    $stm->execute([':chat_id' => $chatId, ':who_sent' => $userId]);
+    $countSystemLog = $stm->rowCount();
+    
+    if ($countSystemLog == 0) {
+      return false;
+    }
+
+    return true;
+  }
+
+  public function open($id, $userId, $companyId) {
+    $message = [ 'success' => false ];
+
+    $userRepository = new UserRepository($this->container);                                                                                
+    $usuario = $userRepository->getUserNameById($userId);
+
+    $lastChat = $this->getLastChat($id, $companyId, $userId);
+
+    if (!$this->hasSystemLog($lastChat["chat_id"], $userId)) {
+      $this->insertSystemLogByChatId($lastChat["chat_id"], "$usuario visualizou este chat.", $userId);
+    }
+
+    $message["success"] = true;
 
     return $message;
   }

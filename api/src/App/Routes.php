@@ -51,6 +51,7 @@ $app->post('/messages/{id}/transfer-user', 'App\Controller\Messages:transferUser
 $app->post('/messages/{id}/send-message', 'App\Controller\Messages:sendMessage')->add(Auth::class)->setName('sendMessage');
 $app->post('/messages/{id}/send-whatsapp', 'App\Controller\Messages:sendMessageWhatsapp')->add(Auth::class)->setName('sendMessageWhatsapp');
 $app->post('/messages/{id}/read', 'App\Controller\Messages:read')->add(Auth::class)->setName('read');
+$app->post('/messages/{id}/open', 'App\Controller\Messages:open')->add(Auth::class)->setName('open');
 $app->get('/company/{id}', 'App\Controller\Company:getCompanyData')->add(Auth::class)->setName('company');
 $app->get('/schedule-messages/{id}', 'App\Controller\Chat:getScheduleMessages')->add(Auth::class)->setName('scheduleMessages');
 $app->post('/send-schedule-message/{id}', 'App\Controller\Chat:sendScheduleMessage')->add(Auth::class)->setName('sendScheduleMessages');
