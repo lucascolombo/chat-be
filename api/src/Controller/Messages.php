@@ -176,13 +176,13 @@ final class Messages
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
         $body = $request->getParsedBody();
-        $files = $request->getUploadedFiles();
         
         $id = $route->getArgument('id');
 
         $text = array_key_exists("text", $body) ? $body["text"] : "";
         $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
         $scheduleDate = array_key_exists("scheduleDate", $body) ? $body["scheduleDate"] : 0;
+        $message_type = array_key_exists("messageType", $body) ? $body["messageType"] : 0;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
@@ -190,7 +190,26 @@ final class Messages
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
 
-        return $response->withJson($chatRepository->sendMessage($id, $userId, $companyId, $text, $scheduleDate, $files));
+        return $response->withJson($chatRepository->sendMessage($id, $userId, $companyId, $text, $scheduleDate, $message_type));
+    }
+
+    public function uploadFiles(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+        $files = $request->getUploadedFiles();
+        
+        $id = $route->getArgument('id');
+        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($chatRepository->uploadFiles($id, $userId, $companyId, $files));
     }
 
     public function sendMessageWhatsapp(Request $request, Response $response, array $args): Response
@@ -204,6 +223,7 @@ final class Messages
         $text = array_key_exists("text", $body) ? $body["text"] : "";
         $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
         $messageId = array_key_exists("messageId", $body) ? $body["messageId"] : 0;
+        $media = array_key_exists("media", $body) ? $body["media"] : 0;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
@@ -211,7 +231,7 @@ final class Messages
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
 
-        return $response->withJson($chatRepository->sendMessageWhatsapp($messageId, $id, $userId, $companyId, $text));
+        return $response->withJson($chatRepository->sendMessageWhatsapp($messageId, $id, $userId, $companyId, $text, $media));
     }
 
     public function read(Request $request, Response $response, array $args): Response

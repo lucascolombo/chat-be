@@ -90,9 +90,9 @@ class SendMedia {
       elseif (strpos($extension, 'jpeg') !== false) {$MediaType = "image";}
       elseif (strpos($extension, 'jpg') !== false) {$MediaType = "image";}
       elseif (strpos($extension, 'png') !== false) {$MediaType = "image";}
+      elseif (strpos($extension, 'webp') !== false) {$MediaType = "image";}
       elseif (strpos($extension, 'mp4') !== false) {$MediaType = "video";}
       elseif (strpos($extension, '3gpp') !== false) {$MediaType = "video";}
-      elseif (strpos($extension, 'webp') !== false) {$MediaType = "sticker";}
       elseif (strpos($extension, 'pdf') !== false) {$MediaType = "document";}
       elseif (strpos($extension, 'doc') !== false) {$MediaType = "document";}
       elseif (strpos($extension, 'dot') !== false) {$MediaType = "document";}
@@ -784,7 +784,7 @@ final class ChatRepository
     return $message;
   }
 
-  public function sendMessageWhatsapp($messageId, $id, $userId, $companyId, $text) {
+  public function sendMessageWhatsapp($messageId, $id, $userId, $companyId, $text, $media) {
     $message = [ 'success' => false ];
 
     $pdo = $this->container->get('db');
@@ -817,7 +817,11 @@ final class ChatRepository
     $instancia = $device["instancia"];
     $token = $device["token"];
 
-    $sender = new SendSimpleText($instancia, $token, $phone, $text, "");
+    if ($media == '1') 
+      $sender = new SendMedia($instancia, $token, $phone, $text);
+    else
+      $sender = new SendSimpleText($instancia, $token, $phone, $text, "");
+
     $messageExternalId = $sender->send();
 
     $stmt = $pdo->prepare("
@@ -832,14 +836,8 @@ final class ChatRepository
     return $message;
   }
 
-  public function sendMessage($id, $userId, $companyId, $text, $scheduleDate, $files) {
-    $dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/' . $id;
-
+  public function sendMessage($id, $userId, $companyId, $text, $scheduleDate, $message_type) {
     $message = [ 'success' => false, "message" => 0 ];
-
-    if (!file_exists($dir)) {
-      mkdir($dir, 0777, true);
-    }
 
     if ($companyId !== null) {
       $pdo = $this->container->get('db');
@@ -875,41 +873,11 @@ final class ChatRepository
 
       if (trim($text) != "") {
         $stmt = $pdo->prepare("
-          INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, schedule_message) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, message_type, schedule_message) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$lastChat["chat_id"], '0', $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id'], ($scheduleDate != 0 ? time() : '0')]);
+        $stmt->execute([$lastChat["chat_id"], '0', $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id'], $message_type, ($scheduleDate != 0 ? time() : '0')]);
         $message["message"] = $scheduleDate == 0 && $status == 0 ? $pdo->lastInsertId() : 0;
-      }
-
-      $index = 0;
-      foreach($files["files"] as $file) {
-        if ($file->getError() === UPLOAD_ERR_OK) {
-          $extension = pathinfo($file->getClientFilename(), PATHINFO_EXTENSION);
-
-          $datetime = time();
-          $basename = $lastChat["chat_id"] . "_" . $index . "_" . $datetime;
-          
-          $filename = $this->moveUploadedFile($dir, $file, $basename, $extension);
-
-          $filePath = 'https://' . $_SERVER['HTTP_HOST'] . '/file/' . $id . '/' . $filename;
-
-          if ($scheduleDate == 0 && $status == 0) {
-            $midiaSender = new SendMedia($instancia, $token, $phone, $filePath);
-            $messageExternalId = $midiaSender->send();
-          }
-          else $messageExternalId = 0;
-
-          if ($messageExternalId !== null) {
-            $stmt = $pdo->prepare("
-              INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, message_type, schedule_message) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([$lastChat["chat_id"], $messageExternalId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $filePath, $lastChat['device_id'], '1', ($scheduleDate != 0 ? time() : '0')]);
-          }
-
-          $index++;
-        }
       }
 
       $stmt = $pdo->prepare("
@@ -919,6 +887,54 @@ final class ChatRepository
         WHERE cco.chat_id = ?
       ");
       $stmt->execute([$datetime, $lastChat["chat_id"]]);
+
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function uploadFiles($id, $userId, $companyId, $files) {
+    $dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/' . $id;
+
+    $message = [ 'success' => false, "files" => [] ];
+
+    if (!file_exists($dir)) {
+      mkdir($dir, 0777, true);
+    }
+
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+      $datetime = time();
+
+      $stmt = $pdo->query("
+        SELECT *
+        FROM clients_chats_opened cco
+        INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
+        INNER JOIN company_invitations ci ON ci.invitations_company_id = crd.company_id AND ci.invitations_employee_id = '$userId'
+        WHERE cco.chat_date_close = 0
+        AND crd.client_id = '$id'
+        AND ci.invitations_company_id = '$companyId'
+        AND ci.invitations_employee_id = '$userId'
+        ORDER BY cco.chat_id DESC
+        LIMIT 1
+      ");
+      $lastChat = $stmt->fetch();
+
+      $index = 0;
+      foreach($files["files"] as $file) {
+        if ($file->getError() === UPLOAD_ERR_OK) {
+          $extension = pathinfo($file->getClientFilename(), PATHINFO_EXTENSION);
+          $datetime = time();
+          $basename = $lastChat["chat_id"] . "_" . $index . "_" . $datetime;
+          $filename = $this->moveUploadedFile($dir, $file, $basename, $extension);
+          $filePath = 'https://' . $_SERVER['HTTP_HOST'] . '/file/' . $id . '/' . $filename;
+
+          $message["files"][] = $filePath;
+
+          $index++;
+        }
+      }
 
       $message["success"] = true;
     }
