@@ -78,7 +78,7 @@ class SendMedia {
       $this->LinkMedia = $LinkMedia;
   }
 
-  public function send() {
+  public function send($label = "Anexo") {
       //if (strlen($this->phone) <= 11){$this->phone = "55".$this->phone;}
       $extension = strtolower(pathinfo($this->LinkMedia, PATHINFO_EXTENSION));
 
@@ -103,7 +103,7 @@ class SendMedia {
       $data = json_encode(array(
           "phone"  => $this->phone,
           $MediaType => $this->LinkMedia,
-          "caption" =>  "Anexo",
+          "caption" =>  $label,
           "fileName" =>  "Arquivo"
       ));
 
@@ -924,15 +924,17 @@ final class ChatRepository
       $index = 0;
       foreach($files["files"] as $file) {
         if ($file->getError() === UPLOAD_ERR_OK) {
-          $extension = pathinfo($file->getClientFilename(), PATHINFO_EXTENSION);
-          $datetime = time();
-          $basename = $lastChat["chat_id"] . "_" . $index . "_" . $datetime;
-          $filename = $this->moveUploadedFile($dir, $file, $basename, $extension);
-          $filePath = 'https://' . $_SERVER['HTTP_HOST'] . '/file/' . $id . '/' . $filename;
+          if ($file->getSize() <= 15 * 1024 * 1024) {
+            $extension = pathinfo($file->getClientFilename(), PATHINFO_EXTENSION);
+            $datetime = time();
+            $basename = $lastChat["chat_id"] . "_" . $index . "_" . $datetime;
+            $filename = $this->moveUploadedFile($dir, $file, $basename, $extension);
+            $filePath = 'https://' . $_SERVER['HTTP_HOST'] . '/file/' . $id . '/' . $filename;
 
-          $message["files"][] = $filePath;
+            $message["files"][] = $filePath;
 
-          $index++;
+            $index++;
+          }
         }
       }
 

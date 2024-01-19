@@ -5,6 +5,7 @@ namespace App\Repository;
 use Pimple\Psr11\Container;
 use App\Lib\Chat;
 use App\Lib\Encrypt;
+use Slim\Psr7\UploadedFile;
 
 final class CompanyRepository
 {
@@ -178,6 +179,60 @@ final class CompanyRepository
     $element["created_at"] = date("d/m/Y H:i:s", $element["created_at"]);
 
     $message = [ 'success' => true, 'company' => $element ];
+
+    return $message;
+  }
+
+  private function moveUploadedFile($directory, UploadedFile $uploadedFile, $basename, $extension) {
+    $filename = $basename . "." . $extension;
+
+    $uploadedFile->moveTo($directory . DIRECTORY_SEPARATOR . $filename);
+
+    return $filename;
+  }
+
+  public function uploadFile($userId, $companyId, $files) {
+    $dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/company_' . $companyId;
+
+    $message = [ 'success' => false, "files" => [] ];
+
+    if (!file_exists($dir)) {
+      mkdir($dir, 0777, true);
+    }
+
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+      $datetime = time();
+
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+      if ($permission) {
+        $index = 0;
+
+        foreach($files["files"] as $file) {
+          if ($file->getError() === UPLOAD_ERR_OK) {
+            if ($file->getSize() <= 25 * 1024 * 1024) {
+              $extension = pathinfo($file->getClientFilename(), PATHINFO_EXTENSION);
+              $basename =  time();
+              $filename = $this->moveUploadedFile($dir, $file, $basename, $extension);
+              $filePath = 'https://' . $_SERVER['HTTP_HOST'] . '/file/company_' . $companyId . '/' . $filename;
+
+              $message["files"][] = $filePath;
+
+              $index++;
+            }
+          }
+        }
+      }
+
+      $message["success"] = true;
+    }
 
     return $message;
   }

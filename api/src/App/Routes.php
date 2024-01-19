@@ -54,6 +54,7 @@ $app->post('/messages/{id}/send-whatsapp', 'App\Controller\Messages:sendMessageW
 $app->post('/messages/{id}/read', 'App\Controller\Messages:read')->add(Auth::class)->setName('read');
 $app->post('/messages/{id}/open', 'App\Controller\Messages:open')->add(Auth::class)->setName('open');
 $app->get('/company/{id}', 'App\Controller\Company:getCompanyData')->add(Auth::class)->setName('company');
+$app->post('/company/{id}/upload-file', 'App\Controller\Company:uploadFile')->add(Auth::class)->setName('companyUploadFile');
 $app->get('/schedule-messages/{id}', 'App\Controller\Chat:getScheduleMessages')->add(Auth::class)->setName('scheduleMessages');
 $app->post('/send-schedule-message/{id}', 'App\Controller\Chat:sendScheduleMessage')->add(Auth::class)->setName('sendScheduleMessages');
 $app->post('/delete-schedule-message/{id}', 'App\Controller\Chat:deleteScheduleMessage')->add(Auth::class)->setName('deleteScheduleMessages');

@@ -66,4 +66,21 @@ final class Company
 
         return $response->withJson($companyRepository->getCompanyData($userId, $id));
     }
+
+    public function uploadFile(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $files = $request->getUploadedFiles();
+        
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->uploadFile($userId, $companyId, $files));
+    }
 }
