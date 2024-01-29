@@ -194,7 +194,7 @@ final class CompanyRepository
   public function uploadFile($userId, $companyId, $files) {
     $dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/company_' . $companyId;
 
-    $message = [ 'success' => false, "files" => [] ];
+    $message = [ 'success' => false, "file" => [] ];
 
     if (!file_exists($dir)) {
       mkdir($dir, 0777, true);
@@ -219,11 +219,12 @@ final class CompanyRepository
           if ($file->getError() === UPLOAD_ERR_OK) {
             if ($file->getSize() <= 25 * 1024 * 1024) {
               $extension = pathinfo($file->getClientFilename(), PATHINFO_EXTENSION);
-              $basename =  time();
+              $basename =  time() + $userId;
               $filename = $this->moveUploadedFile($dir, $file, $basename, $extension);
               $filePath = 'https://' . $_SERVER['HTTP_HOST'] . '/file/company_' . $companyId . '/' . $filename;
 
-              $message["files"][] = $filePath;
+              $message["file"]["path"] = $filePath;
+              $message["file"]["size"] = $file->getSize();
 
               $index++;
             }
@@ -232,6 +233,155 @@ final class CompanyRepository
       }
 
       $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function deleteFile($userId, $companyId, $fileId, $deleteAll) {
+    $message = [ 'success' => false ];
+
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+      if ($permission) {
+        $deleteVars = [time(), $userId, $companyId];
+        $deleteQuery = "
+          UPDATE company_fixed_files
+          SET FixedFiles_deletedDate = ?, FixedFiles_deletedBy = ?
+          WHERE FixedFiles_CompanyID = ?";
+
+        if ($deleteAll == 0) {
+          $deleteQuery .= " AND FixedFiles_id = ?";
+          $deleteVars[] = $fileId;
+        }
+        else {
+          $stmt = $pdo->query("
+            SELECT FixedFiles_FileLink
+            FROM company_fixed_files
+            WHERE FixedFiles_id = '$fileId'
+          ");
+          $fileElement = $stmt->fetch();
+          $link = $fileElement["FixedFiles_FileLink"];
+
+          $deleteQuery .= " AND FixedFiles_FileLink = ?";
+          $deleteVars[] = $link;
+        }
+
+        $stmt = $pdo->prepare($deleteQuery);
+        $stmt->execute($deleteVars);
+
+        $message["success"] = true;
+      }
+    }
+
+    return $message;
+  }
+
+  private function insertFile(
+    $pdo,
+    $userId,
+    $companyId,
+    $file,
+    $label,
+    $setor,
+    $tag,
+    $where,
+    $fileSize,
+    $fileType
+  ) {
+    $stmt = $pdo->prepare("
+      INSERT INTO company_fixed_files (
+        FixedFiles_createdBy,
+        FixedFiles_createdDate,
+        FixedFiles_FileID,
+        FixedFiles_FileLink,
+        FixedFiles_FileSize,
+        FixedFiles_FileType,
+        FixedFiles_FileLabel,
+        FixedFiles_CompanyID,
+        FixedFiles_DepartmentID,
+        FixedFiles_EmployeeID,
+        FixedFiles_TagID
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->execute([$userId, time(), time() + 1, $file, $fileSize, $fileType, $label, $companyId, ($where == 1) ? $setor : 0, ($where == 2) ? $userId : 0, $tag]);
+  }
+
+  public function createFile($userId, $companyId, $file, $label, $setor, $tag, $where, $fileSize, $fileType) {
+    $message = [ 'success' => false ];
+    
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission && $file !== '' && $label !== '') {
+        if ($where == 1 && count($setor) > 0) {
+          foreach ($setor as $s) {
+            $this->insertFile($pdo, $userId, $companyId, $file, $label, $s, $tag, $where, $fileSize, $fileType);
+          }
+          $message["success"] = true;
+        } else if ($where != 1) {
+          $this->insertFile($pdo, $userId, $companyId, $file, $label, $setor, $tag, $where, $fileSize, $fileType);
+          $message["success"] = true;
+        }
+      }
+    }
+
+    return $message;
+  }
+
+  public function getAllFixedFiles($userId, $companyId) {
+    $message = [ 'success' => false, 'files' => [] ];
+    
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission) {
+        $stmt = $pdo->query("
+          SELECT *, count(FixedFiles_FileLink) as fileCount FROM company_fixed_files 
+          WHERE FixedFiles_CompanyID = '$companyId'
+          AND (
+            FixedFiles_EmployeeID = '$userId' OR 
+            FixedFiles_EmployeeID = '0'
+          )
+          AND FixedFiles_deletedDate = '0'
+        ");
+        $fetch = $stmt->fetchAll();
+        $arr = [];
+
+        foreach ($fetch as $single) {
+          $element = $single;
+          $element["FixedFiles_createdDate"] = date("d/m/Y H:i", $element["FixedFiles_createdDate"]);
+          $arr[] = $element;
+        }
+
+        $message = [ 'success' => true, 'files' => $arr ];
+      }
     }
 
     return $message;

@@ -83,4 +83,66 @@ final class Company
 
         return $response->withJson($companyRepository->uploadFile($userId, $companyId, $files));
     }
+
+    public function deleteFile(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $body = $request->getParsedBody();
+        
+        $companyId = Encrypt::decode($route->getArgument('id'));
+        $fileId = $route->getArgument('fileId');
+
+        $deleteAll = array_key_exists("deleteAll", $body) ? $body["deleteAll"] : 0;
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->deleteFile($userId, $companyId, $fileId, $deleteAll));
+    }
+
+    public function createFile(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $file = array_key_exists("file", $body) ? $body["file"] : "";
+        $label = array_key_exists("label", $body) ? $body["label"] : "";
+        $setor = array_key_exists("setor", $body) ? $body["setor"] : [];
+        $tag = array_key_exists("tag", $body) ? $body["tag"] : "";
+        $where = array_key_exists("where", $body) ? $body["where"] : 0;
+        $fileSize = array_key_exists("fileSize", $body) ? $body["fileSize"] : 0;
+        $fileType = array_key_exists("fileType", $body) ? $body["fileType"] : 0;
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->createFile($userId, $companyId, $file, $label, $setor, $tag, $where, $fileSize, $fileType));
+    }
+
+    public function getAllFixedFiles(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->getAllFixedFiles($userId, $companyId));
+    }
 }
