@@ -342,6 +342,7 @@ final class ChatRepository
         cm.message_id_external,
         cm.who_sent,
         cm.message_type_detail as message,
+        cm.metatags_url,
         cm.system_log,
         ed.employee_name,
         cm.message_created,

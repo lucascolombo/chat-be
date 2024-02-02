@@ -314,7 +314,7 @@ final class CompanyRepository
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    $stmt->execute([$userId, time(), time() + 1, $file, $fileSize, $fileType, $label, $companyId, ($where == 1) ? $setor : 0, ($where == 2) ? $userId : 0, $tag]);
+    $stmt->execute([$userId, time(), time() + 1, $file, $fileSize, $fileType, $label, $companyId, ($where == 1) ? $setor : 0, ($where == 2) ? $userId : 0, $tag === '' ? 0 : $tag]);
   }
 
   public function createFile($userId, $companyId, $file, $label, $setor, $tag, $where, $fileSize, $fileType) {
@@ -363,13 +363,15 @@ final class CompanyRepository
 
       if ($permission) {
         $stmt = $pdo->query("
-          SELECT *, count(FixedFiles_FileLink) as fileCount FROM company_fixed_files 
+          SELECT *, count(*) as fileCount 
+          FROM company_fixed_files 
           WHERE FixedFiles_CompanyID = '$companyId'
           AND (
             FixedFiles_EmployeeID = '$userId' OR 
             FixedFiles_EmployeeID = '0'
           )
           AND FixedFiles_deletedDate = '0'
+          GROUP BY FixedFiles_FileLink
         ");
         $fetch = $stmt->fetchAll();
         $arr = [];

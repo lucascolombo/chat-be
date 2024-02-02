@@ -116,7 +116,7 @@ final class Company
         $file = array_key_exists("file", $body) ? $body["file"] : "";
         $label = array_key_exists("label", $body) ? $body["label"] : "";
         $setor = array_key_exists("setor", $body) ? $body["setor"] : [];
-        $tag = array_key_exists("tag", $body) ? $body["tag"] : "";
+        $tag = array_key_exists("tag", $body) ? $body["tag"] : 0;
         $where = array_key_exists("where", $body) ? $body["where"] : 0;
         $fileSize = array_key_exists("fileSize", $body) ? $body["fileSize"] : 0;
         $fileType = array_key_exists("fileType", $body) ? $body["fileType"] : 0;
