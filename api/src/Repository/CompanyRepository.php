@@ -388,4 +388,77 @@ final class CompanyRepository
 
     return $message;
   }
+
+  public function createDefaultMessage($userId, $companyId, $title, $message, $tag) {
+    $msg = [ 'success' => false ];
+    
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission && $title !== '' && $message !== '') {
+        $stmt = $pdo->prepare("
+          INSERT INTO company_fixed_messages (
+            FixedMSG_createdBy,
+            FixedMSG_createdDate,
+            FixedMSG_msgID,
+            FixedMSG_Label,
+            FixedMSG_FullTXT,
+            FixedMSG_CompanyID,
+            FixedMSG_EmployeeID,
+            FixedMSG_TagID
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$userId, time(), time() + 1, $title, $message, $companyId, $userId, $tag === '' ? 0 : $tag]);
+
+        $msg = [ 'success' => true ];
+      }
+    }
+
+    return $msg;
+  }
+
+  public function getAllDefaultMessages($userId, $companyId) {
+    $message = [ 'success' => false, 'messages' => [] ];
+    
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission) {
+        $stmt = $pdo->query("
+          SELECT * FROM company_fixed_messages
+          WHERE FixedMSG_EmployeeID = '$userId'
+          AND FixedMSG_CompanyID = '$companyId'
+        ");
+        $fetch = $stmt->fetchAll();
+        $arr = [];
+
+        foreach ($fetch as $single) {
+          $element = $single;
+          $element["FixedMSG_createdDate"] = date("d/m/Y H:i", $element["FixedMSG_createdDate"]);
+          $arr[] = $element;
+        }
+
+        $message = [ 'success' => true, 'messages' => $arr ];
+      }
+    }
+
+    return $message;
+  }
 }

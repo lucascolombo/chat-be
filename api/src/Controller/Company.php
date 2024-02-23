@@ -145,4 +145,41 @@ final class Company
 
         return $response->withJson($companyRepository->getAllFixedFiles($userId, $companyId));
     }
+
+    public function createDefaultMessage(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $title = array_key_exists("title", $body) ? $body["title"] : "";
+        $message = array_key_exists("message", $body) ? $body["message"] : "";
+        $tag = array_key_exists("tag", $body) ? $body["tag"] : 0;
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->createDefaultMessage($userId, $companyId, $title, $message, $tag));
+    }
+
+    public function getAllDefaultMessages(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->getAllDefaultMessages($userId, $companyId));
+    }
 }

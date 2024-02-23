@@ -354,6 +354,7 @@ final class ChatRepository
       FROM clients_messages cm
       LEFT JOIN employee_details ed ON ed.employee_id = cm.who_sent
       WHERE cm.client_id = '$id'
+      AND cm.system_log_hidden <= 0
       AND cm.message_created <= '$datetime'
       AND cm.company_id IN (
         SELECT invitations_company_id
