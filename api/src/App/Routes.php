@@ -66,6 +66,8 @@ $app->post('/chat/{id}/markAsRead', 'App\Controller\Chat:markAsRead')->add(Auth:
 $app->post('/chat/{id}/markAsUnread', 'App\Controller\Chat:markAsUnread')->add(Auth::class)->setName('markAsUnread');
 $app->post('/company/{id}/create-default-message', 'App\Controller\Company:createDefaultMessage')->add(Auth::class)->setName('createDefaultMessage');
 $app->get('/company/{id}/default-messages', 'App\Controller\Company:getAllDefaultMessages')->add(Auth::class)->setName('getAllDefaultMessages');
+$app->post('/company/{id}/default-messages/{idMessage}', 'App\Controller\Company:updateMessage')->add(Auth::class)->setName('updateMessage');
+$app->post('/company/{id}/share-default-messages/', 'App\Controller\Company:shareMessages')->add(Auth::class)->setName('shareMessages');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

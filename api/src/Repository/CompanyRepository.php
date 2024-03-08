@@ -461,4 +461,103 @@ final class CompanyRepository
 
     return $message;
   }
+
+  public function updateMessage($userId, $companyId, $messageId, $title, $content) {
+    $message = [ 'success' => false ];
+    
+    if ($companyId !== null && $messageId !== null) {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission) {
+        if ($title) {
+          $stmt = $pdo->prepare("
+            UPDATE company_fixed_messages 
+            SET FixedMSG_Label = ?
+            WHERE FixedMSG_id = ?
+          ");
+          $stmt->execute([$title, $messageId]);
+        }
+
+        if ($content) {
+          $stmt = $pdo->prepare("
+            UPDATE company_fixed_messages 
+            SET FixedMSG_FullTXT = ?
+            WHERE FixedMSG_id = ?
+          ");
+          $stmt->execute([$content, $messageId]);
+        }
+
+        $message = [ 'success' => true ];
+      }
+    }
+
+    return $message;
+  }
+
+  public function shareMessages($userId, $companyId, $users, $messages) {
+    $message = [ 'success' => false ];
+    
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission) {
+        foreach ($users as $userCopyId) {
+          $stmt = $pdo->query("
+            SELECT *  
+            FROM company_fixed_messages 
+            WHERE FixedMSG_id IN ('" . implode("' , '", $messages) . "')
+          ");
+          $fetch = $stmt->fetchAll();
+          $arr = [];
+
+          foreach ($fetch as $single) {
+            $stmt = $pdo->prepare("
+              INSERT INTO company_fixed_messages (
+                FixedMSG_createdBy,
+                FixedMSG_createdDate,
+                FixedMSG_msgID,
+                FixedMSG_Label,
+                FixedMSG_FullTXT,
+                FixedMSG_CompanyID,
+                FixedMSG_EmployeeID,
+                FixedMSG_TagID
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+
+            $stmt->execute([
+              $userId, 
+              time(), 
+              time() + 1, 
+              $single["FixedMSG_Label"], 
+              $single["FixedMSG_FullTXT"], 
+              $companyId, 
+              $userCopyId, 
+              $single["FixedMSG_TagID"]
+            ]);
+          }
+        }
+
+        $message = [ 'success' => true ];
+      }
+    }
+
+    return $message;
+  }
 }

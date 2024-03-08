@@ -182,4 +182,45 @@ final class Company
 
         return $response->withJson($companyRepository->getAllDefaultMessages($userId, $companyId));
     }
+
+    public function updateMessage(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+        $messageId = $route->getArgument('idMessage');
+
+        $title = array_key_exists("title", $body) && $body["title"] !== "" ? $body["title"] : null;
+        $content = array_key_exists("content", $body) && $body["content"] !== "" ? $body["content"] : null;
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->updateMessage($userId, $companyId, $messageId, $title, $content));
+    }
+
+    public function shareMessages(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $users = array_key_exists("users", $body) ? $body["users"] : [];
+        $messages = array_key_exists("messages", $body) ? $body["messages"] : [];
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->shareMessages($userId, $companyId, $users, $messages));
+    }
 }
