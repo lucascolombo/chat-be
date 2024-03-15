@@ -153,6 +153,38 @@ final class CompanyRepository
     return $message;
   }
 
+  public function getAllCompanyUsers($userId, $companyId) {
+    $message = [ 'success' => false, 'users' => [] ];
+
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->query("
+      SELECT e.employee_id, e.employee_name 
+      FROM employee_details e
+      WHERE e.employee_id IN (
+        SELECT ci.invitations_employee_id
+        FROM company_invitations ci
+        WHERE ci.invitations_company_id = '$companyId'
+        AND ci.invitations_accept > 0
+        AND ci.invitations_finish = 0
+      )
+      AND e.employee_id <> '$userId'
+    ");
+    $fetch = $stmt->fetchAll();
+    $arr = [];
+
+    foreach ($fetch as $single) {
+      $element = [];
+      $element["value"] = $single["employee_id"];
+      $element["name"] = $single["employee_name"];
+      $arr[] = $element;
+    }
+
+    $message = [ 'success' => true, 'users' => $arr ];
+
+    return $message;
+  }
+
   public function getCompanyData($userId, $companyId) {
     $message = [ 'success' => false ];
 
@@ -445,6 +477,8 @@ final class CompanyRepository
           SELECT * FROM company_fixed_messages
           WHERE FixedMSG_EmployeeID = '$userId'
           AND FixedMSG_CompanyID = '$companyId'
+          AND FixedMSG_deletedDate = '0'
+          ORDER BY FixedMSG_OrderBy ASC
         ");
         $fetch = $stmt->fetchAll();
         $arr = [];
@@ -553,6 +587,65 @@ final class CompanyRepository
             ]);
           }
         }
+
+        $message = [ 'success' => true ];
+      }
+    }
+
+    return $message;
+  }
+
+  public function deleteMessage($userId, $companyId, $messageId) {
+    $message = [ 'success' => false ];
+    
+    if ($companyId !== null && $messageId !== null) {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission) {
+        $stmt = $pdo->prepare("
+          UPDATE company_fixed_messages 
+          SET FixedMSG_deletedDate = ?,
+          FixedMSG_deletedBy = ?
+          WHERE FixedMSG_id = ?
+        ");
+        $stmt->execute([time(), $userId, $messageId]);
+
+        $message = [ 'success' => true ];
+      }
+    }
+
+    return $message;
+  }
+
+  public function reorderMessage($userId, $companyId, $messageId, $order) {
+    $message = [ 'success' => false ];
+    
+    if ($companyId !== null && $messageId !== null) {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission) {
+        $stmt = $pdo->prepare("
+          UPDATE company_fixed_messages 
+          SET FixedMSG_OrderBy = ?
+          WHERE FixedMSG_id = ?
+        ");
+        $stmt->execute([$order, $messageId]);
 
         $message = [ 'success' => true ];
       }

@@ -223,4 +223,58 @@ final class Company
 
         return $response->withJson($companyRepository->shareMessages($userId, $companyId, $users, $messages));
     }
+
+    public function getAllCompanyUsers(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->getAllCompanyUsers($userId, $companyId));
+    }
+
+    public function deleteMessage(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+        $messageId = $route->getArgument('idMessage');
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->deleteMessage($userId, $companyId, $messageId));
+    }
+
+    public function reorderMessage(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+        $messageId = $route->getArgument('idMessage');
+
+        $order = array_key_exists("order", $body) && $body["order"] !== "" ? $body["order"] : 0;
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->reorderMessage($userId, $companyId, $messageId, $order));
+    }
 }
