@@ -226,6 +226,7 @@ final class ChatRepository
       cco.chat_mark_unread,
       (SELECT message_type_detail FROM clients_messages WHERE chat_id = cco.chat_id AND message_deleted_date = 0 AND message_created <= UNIX_TIMESTAMP() ORDER BY message_id DESC LIMIT 1) as last_message,
       (SELECT message_type FROM clients_messages WHERE chat_id = cco.chat_id AND message_deleted_date = 0 AND message_created <= UNIX_TIMESTAMP() ORDER BY message_id DESC LIMIT 1) as last_message_type,
+      (SELECT IFNULL(e.employee_name, 0) FROM clients_messages cm LEFT JOIN employee_details e ON e.employee_id = cm.who_sent WHERE cm.chat_id = cco.chat_id AND cm.message_deleted_date = 0 AND cm.message_created <= UNIX_TIMESTAMP() ORDER BY cm.message_id DESC LIMIT 1) as last_message_user,
       cco.chat_standby,
       crd.department_fixed,
       crd.employee_fixed
@@ -350,7 +351,8 @@ final class ChatRepository
         cm.message_status,
         cm.message_type,
         cm.message_deleted_date,
-        cm.message_edited_date
+        cm.message_edited_date,
+        cm.message_reaction
       FROM clients_messages cm
       LEFT JOIN employee_details ed ON ed.employee_id = cm.who_sent
       WHERE cm.client_id = '$id'

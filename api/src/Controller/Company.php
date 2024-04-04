@@ -277,4 +277,42 @@ final class Company
 
         return $response->withJson($companyRepository->reorderMessage($userId, $companyId, $messageId, $order));
     }
+
+    public function addUser(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $name = array_key_exists("name", $body) && $body["name"] !== "" ? $body["name"] : '';
+        $email = array_key_exists("email", $body) && $body["email"] !== "" ? $body["email"] : '';
+        $phone = array_key_exists("phone", $body) && $body["phone"] !== "" ? $body["phone"] : '';
+        $password = array_key_exists("password", $body) && $body["password"] !== "" ? $body["password"] : '';
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->addUser($userId, $companyId, $name, $email, $phone, $password));
+    }
+
+    public function getEmployees(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->getEmployees($userId, $companyId));
+    }
 }

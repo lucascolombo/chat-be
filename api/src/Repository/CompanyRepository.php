@@ -41,14 +41,14 @@ final class CompanyRepository
         FROM employee_details
         WHERE employee_id <> '$userId'
         AND employee_id IN (
-            SELECT permissions_employee_id
-            FROM employee_permissions
-            WHERE permissions_department_id IN (
-                SELECT permissions_department_id
-                FROM employee_permissions
-                WHERE permissions_type > 0
-                AND permissions_company_id = '$companyId'
-                AND permissions_employee_id = '$userId'
+            SELECT employee_departments_employeeID
+            FROM employee_departments
+            WHERE employee_departments_departmentID IN (
+                SELECT employee_departments_departmentID
+                FROM employee_departments
+                WHERE employee_departments_finishDate = 0
+                AND employee_departments_companyID = '$companyId'
+                AND employee_departments_employeeID = '$userId'
             )
         )
     ");
@@ -72,10 +72,10 @@ final class CompanyRepository
         SELECT cd.departments_id, cd. departments_name
         FROM company_departments cd
         WHERE cd.departments_id IN (
-            SELECT permissions_department_id
-            FROM employee_permissions 
-            WHERE permissions_employee_id = '$userId'
-            AND permissions_company_id = '$companyId'
+            SELECT employee_departments_departmentID
+            FROM employee_departments 
+            WHERE employee_departments_employeeID = '$userId'
+            AND employee_departments_companyID = '$companyId'
         )
         ORDER BY cd.departments_orderby, cd.departments_name
     ");
@@ -650,6 +650,115 @@ final class CompanyRepository
         $message = [ 'success' => true ];
       }
     }
+
+    return $message;
+  }
+
+  public function addUser($userId, $companyId, $name, $email, $phone, $password) {
+    $message = [ 'success' => false, 'error' => 'Erro na criação do usuário, tente mais tarde.', 'message' => '' ];
+
+    if ($companyId !== null) {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission) {
+        $stmt = $pdo->query("
+          SELECT IF(company_max_users - (SELECT COUNT(*) FROM company_invitations WHERE invitations_company_id = '$companyId' AND invitations_accept > 0 AND invitations_finish = 0) > 0, 1, 0) FROM company_details WHERE company_id = '$companyId';
+        ");
+        $canAddUser = $stmt->fetchColumn();
+
+        if ($canAddUser > 0) {
+          $stmt = $pdo->query("
+            SELECT employee_id FROM employee_details 
+            WHERE employee_mail = '$email'
+          ");
+          $userExists = $stmt->fetchColumn();
+
+          $newUserId = 0;
+
+          if ($userExists > 0) {
+            $newUserId = $userExists;
+            $message['error'] = '';
+            $message['message'] = 'Usuário vinculado com sucesso. No entanto, não foi possível alterar a senha, pois o e-mail informado já está cadastrado no sistema.<br />Se necessário utilize a função Esqueci a Senha na tela de login.';
+          }
+          else {
+            $stmt = $pdo->prepare("
+              INSERT INTO employee_details 
+              (employee_name, employee_mail, employee_password, employee_tel, created_at)
+              VALUES (?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone, time()]);
+            $newUserId = $pdo->lastInsertId();
+
+            $message['error'] = '';
+            $message['message'] = 'Usuário cadastrado com sucesso.';
+          }
+
+          $stmt = $pdo->query("
+            SELECT COUNT(*) FROM company_invitations ci
+            INNER JOIN employee_details e ON e.employee_id = ci.invitations_employee_id
+            WHERE e.employee_mail = '$email'
+            AND ci.invitations_company_id = '$companyId'
+          ");
+          $userCount = $stmt->fetchColumn();
+
+          if ($userCount == 0) {
+            $stmt = $pdo->prepare("
+              INSERT INTO company_invitations 
+              (invitations_company_id, invitations_employee_id, invitations_employee_id_created, invitations_create, invitations_accept)
+              VALUES (?, ?, ?, ?)
+            ");
+            $stmt->execute([$companyId, $newUserId, $userId, time(), time()]);
+
+            $message['success'] = true;
+          }
+          else {
+            $message = [ 'success' => false, 'error' => 'E-mail já cadastrado no sistema.', 'message' => '' ];
+          }
+        }
+        else {
+          $message = [ 'success' => false, 'error' => 'A empresa já atingiu o limite de usuários cadastrados.' ];
+        }
+      }
+    }
+
+    return $message;
+  }
+
+  public function getEmployees($userId, $companyId) {
+    $message = [ 'success' => false, 'users' => [] ];
+
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->query("
+      SELECT e.employee_id, e.employee_name, e.employee_mail, e.employee_tel, e.created_at, IF(CAST('$userId' as UNSIGNED) = e.employee_id, 1, 0) as isMe 
+      FROM employee_details e
+      WHERE e.employee_id IN (
+        SELECT ci.invitations_employee_id
+        FROM company_invitations ci
+        WHERE ci.invitations_company_id = '$companyId'
+        AND ci.invitations_accept > 0
+        AND ci.invitations_finish = 0
+      )
+    ");
+
+    $fetch = $stmt->fetchAll();
+    $arr = [];
+
+    foreach ($fetch as $single) {
+      $element = $single;
+      $element["created_at"] = date("d/m/Y H:i", $element["created_at"]);
+      $arr[] = $element;
+    }
+
+    $message = [ 'success' => true, 'users' => $arr ];
 
     return $message;
   }

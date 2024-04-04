@@ -71,6 +71,8 @@ $app->post('/company/{id}/share-default-messages/', 'App\Controller\Company:shar
 $app->get('/company/{id}/all-users/', 'App\Controller\Company:getAllCompanyUsers')->add(Auth::class)->setName('getAllCompanyUsers');
 $app->post('/company/{id}/delete-message/{idMessage}', 'App\Controller\Company:deleteMessage')->add(Auth::class)->setName('deleteMessage');
 $app->post('/company/{id}/reorder-message/{idMessage}', 'App\Controller\Company:reorderMessage')->add(Auth::class)->setName('reorderMessage');
+$app->post('/company/{id}/add-user', 'App\Controller\Company:addUser')->add(Auth::class)->setName('addUser');
+$app->get('/company/{id}/get-users/', 'App\Controller\Company:getEmployees')->add(Auth::class)->setName('getEmployees');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();
