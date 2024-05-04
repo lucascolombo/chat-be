@@ -732,13 +732,46 @@ final class CompanyRepository
     return $message;
   }
 
+  public function getAllCompanyDepartments($userId, $companyId) {
+    $message = [ 'success' => false, 'departments' => [] ];
+
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->query("
+        SELECT cd.departments_id, cd.departments_name
+        FROM company_departments cd
+        WHERE cd.departments_company_id = '$companyId'
+        ORDER BY cd.departments_orderby, cd.departments_name
+    ");
+    $fetch = $stmt->fetchAll();
+    $arr = [];
+
+    foreach ($fetch as $single) {
+      $element = [];
+      $element["value"] = $single["departments_id"];
+      $element["name"] = $single["departments_name"];
+      $arr[] = $element;
+    }
+
+    $message = [ 'success' => true, 'departments' => $arr ];
+
+    return $message;
+  }
+
   public function getEmployees($userId, $companyId) {
     $message = [ 'success' => false, 'users' => [] ];
 
     $pdo = $this->container->get('db');
 
     $stmt = $pdo->query("
-      SELECT e.employee_id, e.employee_name, e.employee_mail, e.employee_tel, e.created_at, IF(CAST('$userId' as UNSIGNED) = e.employee_id, 1, 0) as isMe 
+      SELECT 
+        e.employee_id, 
+        e.employee_name, 
+        e.employee_mail, 
+        e.employee_tel, 
+        e.created_at, 
+        IF(CAST('$userId' as UNSIGNED) = e.employee_id, 1, 0) as isMe, 
+        (SELECT GROUP_CONCAT(employee_departments_departmentID) FROM employee_departments WHERE employee_departments_employeeID = e.employee_id AND employee_departments_finishDate = 0 AND employee_departments_finishBy = 0) as departments
       FROM employee_details e
       WHERE e.employee_id IN (
         SELECT ci.invitations_employee_id
@@ -759,6 +792,50 @@ final class CompanyRepository
     }
 
     $message = [ 'success' => true, 'users' => $arr ];
+
+    return $message;
+  }
+
+  public function editUser($userId, $companyId, $editUserId, $departments) {
+    $message = [ 'success' => false, 'error' => 'Erro na edição do usuário, tente mais tarde.', 'message' => '' ];
+    
+    if ($companyId !== null && $editUserId != 0 && count($departments) > 0) {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission) {
+        $stmt = $pdo->prepare("
+          UPDATE employee_departments 
+          SET employee_departments_finishDate = ?,
+          	employee_departments_finishBy = ?
+          WHERE employee_departments_employeeID = ?
+        ");
+        $stmt->execute([time(), $userId, $editUserId]);
+
+        foreach ($departments as $departmentId) {
+          $stmt = $pdo->prepare("
+            INSERT INTO employee_departments (
+              employee_departments_employeeID, 
+              employee_departments_departmentID, 
+              employee_departments_companyID, 
+              employee_departments_createDate, 
+              employee_departments_createBy
+            )
+            VALUES (?, ?, ?, ?, ?)
+          ");
+          $stmt->execute([$editUserId, $departmentId, $companyId, time(), $userId]);
+        }
+
+        $message = [ 'success' => true, 'error' => '', 'message' => 'Usuário alterado com sucesso!' ];
+      }
+    }
 
     return $message;
   }

@@ -300,6 +300,26 @@ final class Company
         return $response->withJson($companyRepository->addUser($userId, $companyId, $name, $email, $phone, $password));
     }
 
+    public function editUser(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $editUserId = array_key_exists("id", $body) && $body["id"] !== "" ? $body["id"] : 0;
+        $departments = array_key_exists("departments", $body) ? $body["departments"] : [];
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->editUser($userId, $companyId, $editUserId, $departments));
+    }
+
     public function getEmployees(Request $request, Response $response, array $args): Response
     {
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
@@ -314,5 +334,21 @@ final class Company
         $userId = $user->getId();
 
         return $response->withJson($companyRepository->getEmployees($userId, $companyId));
+    }
+
+    public function getAllCompanyDepartments(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $companyId = Encrypt::decode($route->getArgument('id'));
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+
+        return $response->withJson($companyRepository->getAllCompanyDepartments($userId, $companyId));
     }
 }

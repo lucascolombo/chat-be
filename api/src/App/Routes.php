@@ -72,7 +72,9 @@ $app->get('/company/{id}/all-users/', 'App\Controller\Company:getAllCompanyUsers
 $app->post('/company/{id}/delete-message/{idMessage}', 'App\Controller\Company:deleteMessage')->add(Auth::class)->setName('deleteMessage');
 $app->post('/company/{id}/reorder-message/{idMessage}', 'App\Controller\Company:reorderMessage')->add(Auth::class)->setName('reorderMessage');
 $app->post('/company/{id}/add-user', 'App\Controller\Company:addUser')->add(Auth::class)->setName('addUser');
+$app->post('/company/{id}/edit-user', 'App\Controller\Company:editUser')->add(Auth::class)->setName('editUser');
 $app->get('/company/{id}/get-users/', 'App\Controller\Company:getEmployees')->add(Auth::class)->setName('getEmployees');
+$app->get('/company/{id}/get-all-company-departments/', 'App\Controller\Company:getAllCompanyDepartments')->add(Auth::class)->setName('getAllCompanyDepartments');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();
