@@ -41,13 +41,13 @@ final class Client
         $body = $request->getParsedBody();
         
         $id = $route->getArgument('id');
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $clientRepository = new ClientRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($clientRepository->start($id, $companyId, $userId));
     }
@@ -59,13 +59,13 @@ final class Client
         $body = $request->getParsedBody();
         
         $id = $route->getArgument('id');
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $clientRepository = new ClientRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($clientRepository->finish($id, $companyId, $userId));
     }

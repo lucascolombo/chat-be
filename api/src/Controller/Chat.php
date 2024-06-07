@@ -26,9 +26,9 @@ final class Chat
         $userRepository = new UserRepository($this->container);                                                                                
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $company = $user->getCompanyId();
 
         $params = $request->getQueryParams();
-        $company = isset($params["company"]) && $params["company"] !== '' ? Encrypt::decode($params["company"]) : null;
         $limit = isset($params["limit"]) ? $params["limit"] : 10;
         $search = isset($params["search"]) ? $params["search"] : '';
         $nao_lido = isset($params["nao_lido"]) ? $params["nao_lido"] === "true" || $params["nao_lido"] === true  : false;
@@ -78,7 +78,7 @@ final class Chat
         $statusDateValidity = array_key_exists("statusDateValidity", $body) ? $body["statusDateValidity"] : ($status == 1 ? "0" : time());
         $endMessage = array_key_exists("endMessage", $body) ? $body["endMessage"] : "";
         $telefone = array_key_exists("telefone", $body) ? $body["telefone"] : "0";
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : "0";
+        $companyId = $user->getCompanyId();
         $deviceId = array_key_exists("deviceId", $body) ? $body["deviceId"] : "0";
 
         $chatRepository = new ChatRepository($this->container);
@@ -150,7 +150,7 @@ final class Chat
         $phone = array_key_exists("phone", $body) ? $body["phone"] : "";
         $country = array_key_exists("country", $body) ? $body["country"] : "";
         $setor = array_key_exists("setor", $body) ? $body["setor"] : "";
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
+        $companyId = $user->getCompanyId();
 
         $chatRepository = new ChatRepository($this->container);
 
@@ -170,7 +170,7 @@ final class Chat
         $id = $route->getArgument('id');
 
         $body = $request->getParsedBody();
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : "0";
+        $companyId = $user->getCompanyId();
 
         $chatRepository = new ChatRepository($this->container);
 
@@ -190,7 +190,7 @@ final class Chat
         $id = $route->getArgument('id');
 
         $body = $request->getParsedBody();
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : "0";
+        $companyId = $user->getCompanyId();
 
         $chatRepository = new ChatRepository($this->container);
 

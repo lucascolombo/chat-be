@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 namespace App\Lib;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Firebase\JWT\JWT;
 
 final class Encrypt
 {
@@ -73,5 +75,24 @@ final class Encrypt
         }
     
         return ltrim($decryptedNumber, '0');
+    }
+
+    public static function createJWT(Request $request, String $username, \DateTimeImmutable $issuedAt, int $expire, String $companyId) {
+        $serverName = $request->getServerParams()['HTTP_HOST'];                                   
+
+        $data = [
+            'iat'  => $issuedAt->getTimestamp(),
+            'iss'  => $serverName,
+            'nbf'  => $issuedAt->getTimestamp(),
+            'exp'  => $expire,
+            'companyId' => $companyId,
+            'userName' => $username,
+        ];
+
+        return JWT::encode(
+            $data,
+            $_SERVER['JWT_SECRET_KEY'],
+            'HS512'
+        );
     }
 }

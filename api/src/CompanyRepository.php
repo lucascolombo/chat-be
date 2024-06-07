@@ -982,6 +982,18 @@ final class CompanyRepository
       $now = date('H:i:s');
 
       $stmt = $pdo->query("
+        SELECT permissions_employee_access_time_hour_end as end 
+        FROM permissions_employee_access_time 
+        WHERE permissions_employee_access_time_company_id = '$companyId'
+        AND permissions_employee_access_time_employee_id = '$userId'
+        AND permissions_employee_access_time_work_day = '$w'
+        AND permissions_employee_access_time_hour_start <= '$now'
+        AND permissions_employee_access_time_hour_end >= '$now'
+        AND permissions_employee_access_time_deletedAt = 0
+      ");
+      $time = $stmt->fetch();
+
+      return "
         SELECT `permissions_employee_access_time_hour_end` as end 
         FROM `permissions_employee_access_time` 
         WHERE `permissions_employee_access_time_employee_id` = $userId 
@@ -990,8 +1002,7 @@ final class CompanyRepository
         AND `permissions_employee_access_time_hour_start` <= NOW() 
         AND `permissions_employee_access_time_hour_end` >= NOW() 
         AND `permissions_employee_access_time_deletedAt` = 0
-      ");
-      $time = $stmt->fetch();
+        ";
 
       return $time ? $time['end'] : null;
     }

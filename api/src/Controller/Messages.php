@@ -27,13 +27,13 @@ final class Messages
         
         $id = $route->getArgument('id');
         $tags = array_key_exists("tags", $body) ? $body["tags"] : null;
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->saveTags($id, $tags, $companyId, $userId));
     }
@@ -47,13 +47,13 @@ final class Messages
         $id = $route->getArgument('id');
         $assignedUserId = array_key_exists("user", $body) ? $body["user"] : null;
         $assignedDate = array_key_exists("date", $body) ? $body["date"] : null;
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->assignUser($id, $assignedUserId, $assignedDate, $companyId, $userId));
     }
@@ -65,13 +65,13 @@ final class Messages
         $body = $request->getParsedBody();
         
         $id = $route->getArgument('id');
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->addToQueue($id, $userId, $companyId));
     }
@@ -83,13 +83,13 @@ final class Messages
         $body = $request->getParsedBody();
         
         $id = $route->getArgument('id');
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->removeToQueue($id, $userId, $companyId));
     }
@@ -102,13 +102,13 @@ final class Messages
         
         $id = $route->getArgument('id');
         $assignedSetorId = array_key_exists("setor", $body) ? $body["setor"] : null;
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->assignSetor($id, $assignedSetorId, $companyId, $userId));
     }
@@ -119,11 +119,11 @@ final class Messages
         $route = $routeContext->getRoute();
         
         $id = $route->getArgument('id');
-        $companyId = Encrypt::decode($route->getArgument('companyId'));
 
         $userRepository = new UserRepository($this->container);                                                                                
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         $params = $request->getQueryParams();
         $limit = isset($params["limit"]) ? $params["limit"] : 50;
@@ -141,13 +141,13 @@ final class Messages
         
         $id = $route->getArgument('id');
         $setor = array_key_exists("setor", $body) ? $body["setor"] : null;
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->transferSetor($id, $setor, $companyId, $userId));
     }
@@ -160,13 +160,13 @@ final class Messages
         
         $id = $route->getArgument('id');
         $userTransfer = array_key_exists("user", $body) ? $body["user"] : null;
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->transferUser($id, $userTransfer, $companyId, $userId));
     }
@@ -180,7 +180,6 @@ final class Messages
         $id = $route->getArgument('id');
 
         $text = array_key_exists("text", $body) ? $body["text"] : "";
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
         $scheduleDate = array_key_exists("scheduleDate", $body) ? $body["scheduleDate"] : 0;
         $message_type = array_key_exists("messageType", $body) ? $body["messageType"] : 0;
 
@@ -189,6 +188,7 @@ final class Messages
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->sendMessage($id, $userId, $companyId, $text, $scheduleDate, $message_type));
     }
@@ -201,13 +201,13 @@ final class Messages
         $files = $request->getUploadedFiles();
         
         $id = $route->getArgument('id');
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->uploadFiles($id, $userId, $companyId, $files));
     }
@@ -221,7 +221,6 @@ final class Messages
         $id = $route->getArgument('id');
 
         $text = array_key_exists("text", $body) ? $body["text"] : "";
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
         $messageId = array_key_exists("messageId", $body) ? $body["messageId"] : 0;
         $media = array_key_exists("media", $body) ? $body["media"] : 0;
 
@@ -230,6 +229,7 @@ final class Messages
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->sendMessageWhatsapp($messageId, $id, $userId, $companyId, $text, $media));
     }
@@ -241,13 +241,13 @@ final class Messages
         $body = $request->getParsedBody();
         
         $id = $route->getArgument('id');
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->read($id, $userId, $companyId));
     }
@@ -259,13 +259,13 @@ final class Messages
         $body = $request->getParsedBody();
         
         $id = $route->getArgument('id');
-        $companyId = array_key_exists("companyId", $body) ? Encrypt::decode($body["companyId"]) : null;
 
         $userRepository = new UserRepository($this->container);
         $chatRepository = new ChatRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($chatRepository->open($id, $userId, $companyId));
     }

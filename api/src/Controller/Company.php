@@ -33,7 +33,7 @@ final class Company
 
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
-        $companyId = Encrypt::decode($route->getArgument('id'));
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->getCompanyFiltersOptions($userId, $companyId));
     }
@@ -72,14 +72,13 @@ final class Company
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
         $files = $request->getUploadedFiles();
-        
-        $companyId = Encrypt::decode($route->getArgument('id'));
 
         $userRepository = new UserRepository($this->container);
         $companyRepository = new CompanyRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->uploadFile($userId, $companyId, $files));
     }
@@ -91,7 +90,6 @@ final class Company
 
         $body = $request->getParsedBody();
         
-        $companyId = Encrypt::decode($route->getArgument('id'));
         $fileId = $route->getArgument('fileId');
 
         $deleteAll = array_key_exists("deleteAll", $body) ? $body["deleteAll"] : 0;
@@ -101,6 +99,7 @@ final class Company
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->deleteFile($userId, $companyId, $fileId, $deleteAll));
     }
@@ -110,8 +109,6 @@ final class Company
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
         $body = $request->getParsedBody();
-
-        $companyId = Encrypt::decode($route->getArgument('id'));
 
         $file = array_key_exists("file", $body) ? $body["file"] : "";
         $label = array_key_exists("label", $body) ? $body["label"] : "";
@@ -126,6 +123,7 @@ final class Company
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->createFile($userId, $companyId, $file, $label, $setor, $tag, $where, $fileSize, $fileType));
     }
@@ -135,13 +133,12 @@ final class Company
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
-
         $userRepository = new UserRepository($this->container);
         $companyRepository = new CompanyRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->getAllFixedFiles($userId, $companyId));
     }
@@ -152,8 +149,6 @@ final class Company
         $route = $routeContext->getRoute();
         $body = $request->getParsedBody();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
-
         $title = array_key_exists("title", $body) ? $body["title"] : "";
         $message = array_key_exists("message", $body) ? $body["message"] : "";
         $tag = array_key_exists("tag", $body) ? $body["tag"] : 0;
@@ -163,6 +158,7 @@ final class Company
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->createDefaultMessage($userId, $companyId, $title, $message, $tag));
     }
@@ -172,13 +168,12 @@ final class Company
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
-
         $userRepository = new UserRepository($this->container);
         $companyRepository = new CompanyRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->getAllDefaultMessages($userId, $companyId));
     }
@@ -189,7 +184,6 @@ final class Company
         $route = $routeContext->getRoute();
         $body = $request->getParsedBody();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
         $messageId = $route->getArgument('idMessage');
 
         $title = array_key_exists("title", $body) && $body["title"] !== "" ? $body["title"] : null;
@@ -200,6 +194,7 @@ final class Company
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->updateMessage($userId, $companyId, $messageId, $title, $content));
     }
@@ -210,8 +205,6 @@ final class Company
         $route = $routeContext->getRoute();
         $body = $request->getParsedBody();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
-
         $users = array_key_exists("users", $body) ? $body["users"] : [];
         $messages = array_key_exists("messages", $body) ? $body["messages"] : [];
 
@@ -220,6 +213,7 @@ final class Company
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->shareMessages($userId, $companyId, $users, $messages));
     }
@@ -229,13 +223,12 @@ final class Company
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
-
         $userRepository = new UserRepository($this->container);
         $companyRepository = new CompanyRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->getAllCompanyUsers($userId, $companyId));
     }
@@ -246,7 +239,6 @@ final class Company
         $route = $routeContext->getRoute();
         $body = $request->getParsedBody();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
         $messageId = $route->getArgument('idMessage');
 
         $userRepository = new UserRepository($this->container);
@@ -254,6 +246,7 @@ final class Company
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->deleteMessage($userId, $companyId, $messageId));
     }
@@ -264,7 +257,6 @@ final class Company
         $route = $routeContext->getRoute();
         $body = $request->getParsedBody();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
         $messageId = $route->getArgument('idMessage');
 
         $order = array_key_exists("order", $body) && $body["order"] !== "" ? $body["order"] : 0;
@@ -274,6 +266,7 @@ final class Company
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->reorderMessage($userId, $companyId, $messageId, $order));
     }
@@ -283,8 +276,6 @@ final class Company
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
         $body = $request->getParsedBody();
-
-        $companyId = Encrypt::decode($route->getArgument('id'));
 
         $name = array_key_exists("name", $body) && $body["name"] !== "" ? $body["name"] : '';
         $email = array_key_exists("email", $body) && $body["email"] !== "" ? $body["email"] : '';
@@ -296,6 +287,7 @@ final class Company
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->addUser($userId, $companyId, $name, $email, $phone, $password));
     }
@@ -306,18 +298,58 @@ final class Company
         $route = $routeContext->getRoute();
         $body = $request->getParsedBody();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
-
         $editUserId = array_key_exists("id", $body) && $body["id"] !== "" ? $body["id"] : 0;
         $departments = array_key_exists("departments", $body) ? $body["departments"] : [];
+        $displayName = array_key_exists("display_name", $body) && trim($body["display_name"]) !== "" ? $body["display_name"] : "";
+
+        $activate_access = array_key_exists("activate_access", $body) && $body["activate_access"] ? $body["activate_access"] : false;
+
+        $activate_access_Seg = array_key_exists("activate_access_Seg", $body) && $body["activate_access_Seg"] ? $body["activate_access_Seg"] : false;
+        $from_Seg = array_key_exists("from_Seg", $body) && $body["from_Seg"] ? $body["from_Seg"] : null;
+        $to_Seg = array_key_exists("to_Seg", $body) && $body["to_Seg"] ? $body["to_Seg"] : null;
+
+        $activate_access_Ter = array_key_exists("activate_access_Ter", $body) && $body["activate_access_Ter"] ? $body["activate_access_Ter"] : false;
+        $from_Ter = array_key_exists("from_Ter", $body) && $body["from_Ter"] ? $body["from_Ter"] : null;
+        $to_Ter = array_key_exists("to_Ter", $body) && $body["to_Ter"] ? $body["to_Ter"] : null;
+
+        $activate_access_Qua = array_key_exists("activate_access_Qua", $body) && $body["activate_access_Qua"] ? $body["activate_access_Qua"] : false;
+        $from_Qua = array_key_exists("from_Qua", $body) && $body["from_Qua"] ? $body["from_Qua"] : null;
+        $to_Qua = array_key_exists("to_Qua", $body) && $body["to_Qua"] ? $body["to_Qua"] : null;
+
+        $activate_access_Qui = array_key_exists("activate_access_Qui", $body) && $body["activate_access_Qui"] ? $body["activate_access_Qui"] : false;
+        $from_Qui = array_key_exists("from_Qui", $body) && $body["from_Qui"] ? $body["from_Qui"] : null;
+        $to_Qui = array_key_exists("to_Qui", $body) && $body["to_Qui"] ? $body["to_Qui"] : null;
+
+        $activate_access_Sex = array_key_exists("activate_access_Sex", $body) && $body["activate_access_Sex"] ? $body["activate_access_Sex"] : false;
+        $from_Sex = array_key_exists("from_Sex", $body) && $body["from_Sex"] ? $body["from_Sex"] : null;
+        $to_Sex = array_key_exists("to_Sex", $body) && $body["to_Sex"] ? $body["to_Sex"] : null;
+
+        $activate_access_Sab = array_key_exists("activate_access_Sab", $body) && $body["activate_access_Sab"] ? $body["activate_access_Sab"] : false;
+        $from_Sab = array_key_exists("from_Sab", $body) && $body["from_Sab"] ? $body["from_Sab"] : null;
+        $to_Sab = array_key_exists("to_Sab", $body) && $body["to_Sab"] ? $body["to_Sab"] : null;
+
+        $activate_access_Dom = array_key_exists("activate_access_Dom", $body) && $body["activate_access_Dom"] ? $body["activate_access_Dom"] : false;
+        $from_Dom = array_key_exists("from_Dom", $body) && $body["from_Dom"] ? $body["from_Dom"] : null;
+        $to_Dom = array_key_exists("to_Dom", $body) && $body["to_Dom"] ? $body["to_Dom"] : null;
+
+        $week_hours = [
+            1 => [ "from" => $from_Seg, "to" => $to_Seg, "active" => $activate_access_Seg],
+            2 => [ "from" => $from_Ter, "to" => $to_Ter, "active" => $activate_access_Ter],
+            3 => [ "from" => $from_Qua, "to" => $to_Qua, "active" => $activate_access_Qua],
+            4 => [ "from" => $from_Qui, "to" => $to_Qui, "active" => $activate_access_Qui],
+            5 => [ "from" => $from_Sex, "to" => $to_Sex, "active" => $activate_access_Sex],
+            6 => [ "from" => $from_Sab, "to" => $to_Sab, "active" => $activate_access_Sab],
+            7 => [ "from" => $from_Dom, "to" => $to_Dom, "active" => $activate_access_Dom],
+        ];
 
         $userRepository = new UserRepository($this->container);
         $companyRepository = new CompanyRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
-        return $response->withJson($companyRepository->editUser($userId, $companyId, $editUserId, $departments));
+        return $response->withJson($companyRepository->editUser($userId, $userRepository, $companyId, $editUserId, $departments, $displayName, $activate_access, $week_hours));
     }
 
     public function getEmployees(Request $request, Response $response, array $args): Response
@@ -325,13 +357,12 @@ final class Company
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
-
         $userRepository = new UserRepository($this->container);
         $companyRepository = new CompanyRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->getEmployees($userId, $companyId));
     }
@@ -341,14 +372,30 @@ final class Company
         $routeContext = RouteContext::fromRequest($request);                                                                                                             
         $route = $routeContext->getRoute();
 
-        $companyId = Encrypt::decode($route->getArgument('id'));
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->getAllCompanyDepartments($userId, $companyId));
+    }
+
+    public function getUserAccessTime(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $employeeId = $route->getArgument('employeeId');
 
         $userRepository = new UserRepository($this->container);
         $companyRepository = new CompanyRepository($this->container);
 
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
 
-        return $response->withJson($companyRepository->getAllCompanyDepartments($userId, $companyId));
+        return $response->withJson($companyRepository->getUserAccessTime($userId, $companyId, $employeeId));
     }
 }

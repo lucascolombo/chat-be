@@ -6,6 +6,7 @@ use Pimple\Psr11\Container;
 use App\Lib\User;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
+use App\Lib\Encrypt;
 
 final class UserRepository
 {
@@ -15,24 +16,35 @@ final class UserRepository
       $this->container= $container;
   }
 
+  public function getUserById($id): User {
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->prepare("SELECT * FROM employee_details WHERE employee_id=?");
+    $stmt->execute([$id]);
+    $fetch = $stmt->fetch();
+
+    if ($fetch) return new User($fetch["employee_id"], $fetch["employee_mail"], $fetch["employee_password"], $fetch["logged_in"], $fetch["expire_at"]);
+
+    return null;
+  }
+
   public function getUserByEmail(string $email): User {
     $pdo = $this->container->get('db');
     $stmt = $pdo->prepare("SELECT * FROM employee_details WHERE employee_mail=?");
     $stmt->execute([$email]);
     $fetch = $stmt->fetch();
 
-    if ($fetch) return new User($fetch["employee_id"], $fetch["employee_mail"], $fetch["employee_password"], $fetch["logged_in"]);
+    if ($fetch) return new User($fetch["employee_id"], $fetch["employee_mail"], $fetch["employee_password"], $fetch["logged_in"], $fetch["expire_at"]);
 
     return null;
   }
 
-  public function updateUserLoggedIn(User $user, \DateTimeImmutable $issuedAt): bool {
+  public function updateUserLoggedIn(User $user, \DateTimeImmutable $issuedAt, int $expire): bool {
     $id = $user->getId();
     $logged_in = $issuedAt->getTimestamp();
     $pdo = $this->container->get('db');
-    $stmt = $pdo->prepare("UPDATE employee_details SET logged_in = ? WHERE employee_id = ?");
+    $stmt = $pdo->prepare("UPDATE employee_details SET logged_in = ?, expire_at = ? WHERE employee_id = ?");
     
-    return $stmt->execute([$logged_in, $id]); 
+    return $stmt->execute([$logged_in, $expire, $id]); 
   }
 
   public function getUserByHeaders($request) {
@@ -57,11 +69,14 @@ final class UserRepository
     }
 
     $logged_in = $token->iat;
+    $expire_at = $token->exp;
     $email = $token->userName;
+    $companyId = Encrypt::decode($token->companyId);
 
     $user = $this->getUserByEmail($email);
+    $user->setCompanyId($companyId);
 
-    if ($user->getLoggedIn() != $logged_in) {
+    if ($user->getLoggedIn() != $logged_in || $user->getExpireAt() != $expire_at) {
       return null;
     }
     

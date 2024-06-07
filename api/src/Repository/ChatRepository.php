@@ -69,7 +69,7 @@ class SendMedia {
   private $instancia; 
   private $token; 
   private $phone; 
-  private $LinkMedia; 
+  private $LinkMedia;
   
   public function __construct($instancia,$token,$phone,$LinkMedia){
       $this->instancia = $instancia;
@@ -352,7 +352,8 @@ final class ChatRepository
         cm.message_type,
         cm.message_deleted_date,
         cm.message_edited_date,
-        cm.message_reaction
+        cm.message_reaction,
+        cm.sent_from
       FROM clients_messages cm
       LEFT JOIN employee_details ed ON ed.employee_id = cm.who_sent
       WHERE cm.client_id = '$id'
@@ -823,17 +824,32 @@ final class ChatRepository
 
     if ($media == '1') 
       $sender = new SendMedia($instancia, $token, $phone, $text);
-    else
+    else {
+      $stmt = $pdo->query("
+        SELECT 
+          employee_displayname
+        FROM employee_details WHERE employee_id = '$userId' 
+      ");
+      $employee = $stmt->fetch();
+      $display_name = trim($employee["employee_displayname"]);
+      if ($display_name !== "") {
+        $text = "*" . $display_name . "*:" . "
+" . $text;
+      }
+
       $sender = new SendSimpleText($instancia, $token, $phone, $text, "");
+    }
 
     $messageExternalId = $sender->send();
 
-    $stmt = $pdo->prepare("
-      UPDATE clients_messages
-      SET message_id_external = ? 
-      WHERE message_id = ?
-    ");
-    $stmt->execute([$messageExternalId, $messageId]);
+    if ($messageExternalId) {
+      $stmt = $pdo->prepare("
+        UPDATE clients_messages
+        SET message_id_external = ? 
+        WHERE message_id = ?
+      ");
+      $stmt->execute([$messageExternalId, $messageId]);
+    }
 
     $message['success'] = true;
 
