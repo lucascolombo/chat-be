@@ -94,4 +94,26 @@ final class UserRepository
     
     return $employee['employee_name'];
   }
+
+  public function updateCompanyOnlineStatus($userId, $companyId) {
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->prepare("UPDATE employee_details SET company_online_status = ? WHERE employee_id = ?");
+    
+    return $stmt->execute([$companyId, $userId]); 
+  }
+
+  public function acceptCompanyInvitations($userId, $companyId) {
+    $pdo = $this->container->get('db');
+
+    $stmt = $pdo->query("
+      SELECT logged_in
+      FROM employee_details
+      WHERE employee_id = '$userId'
+    ");
+    $employee = $stmt->fetch();
+
+    $stmt = $pdo->prepare("UPDATE company_invitations SET invitations_accept = ? WHERE invitations_company_id = ? AND invitations_employee_id = ?");
+    
+    return $stmt->execute([time(), $companyId, $userId]); 
+  }
 }

@@ -67,6 +67,7 @@ final class Home
         if ($email && $password && $companyId) {
             $userRepository = new UserRepository($this->container);
             $user = $userRepository->getUserByEmail($email);
+            $userId = $user->getId();
 
             if ($user && password_verify($password, $user->getPassword())) {
                 $companyRepository = new CompanyRepository($this->container);
@@ -85,6 +86,9 @@ final class Home
                         $expire = $issuedAt->setTime($h, $m, $s)->getTimestamp();
                         $jwt = Encrypt::createJWT($request, $user->getEmail(), $issuedAt, $expire, $companyIdEncoded);
 
+                        $userRepository->updateCompanyOnlineStatus($userId, $companyId);
+                        if ($user->getLoggedIn() == 0) $userRepository->acceptCompanyInvitations($userId, $companyId);
+
                         $message['success'] = $userRepository->updateUserLoggedIn($user, $issuedAt, $expire);
                         $message['jwt'] = $jwt;
                     }
@@ -94,6 +98,9 @@ final class Home
                 }
                 else {
                     $jwt = Encrypt::createJWT($request, $email, $issuedAt, $expire, $companyIdEncoded);
+
+                    $userRepository->updateCompanyOnlineStatus($userId, $companyId);
+                    if ($user->getLoggedIn() == 0) $userRepository->acceptCompanyInvitations($userId, $companyId);
 
                     $message['success'] = $userRepository->updateUserLoggedIn($user, $issuedAt, $expire);
                     $message['jwt'] = $jwt;
