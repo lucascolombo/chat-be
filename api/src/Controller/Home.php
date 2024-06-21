@@ -28,7 +28,7 @@ final class Home
 
     public function doLogin(Request $request, Response $response): Response
     {
-        $message = [ 'success' => false, 'companies' => [] ];
+        $message = [ 'success' => false, 'error' => 'DATA_NOT_FOUND_ERROR', 'companies' => [] ];
         $body = $request->getParsedBody();
 
         $email = array_key_exists("email", $body) ? $body["email"] : null;
@@ -44,10 +44,12 @@ final class Home
                 $message['user'] = $companyRepository->getUserCompanies($user->getId());
             }
             else {
+                $message['success'] = false;
                 $message['error'] = 'USER_LOGIN_ERROR';
             }
         }
         else {
+            $message['success'] = false;
             $message['error'] = 'DATA_NOT_FOUND_ERROR';
         }
 
@@ -56,7 +58,7 @@ final class Home
 
     public function loginWithCompany(Request $request, Response $response): Response
     {
-        $message = [ 'success' => false ];
+        $message = [ 'success' => false, 'error' => 'DATA_NOT_FOUND_ERROR' ];
         $body = $request->getParsedBody();
 
         $email = array_key_exists("email", $body) ? $body["email"] : null;
@@ -93,6 +95,7 @@ final class Home
                         $message['jwt'] = $jwt;
                     }
                     else {
+                        $message['success'] = false;
                         $message['error'] = 'USER_CANT_LOGIN_DATETIME';
                     }
                 }
@@ -107,10 +110,12 @@ final class Home
                 }
             }
             else {
+                $message['success'] = false;
                 $message['error'] = 'USER_LOGIN_ERROR';
             }
         }
         else {
+            $message['success'] = false;
             $message['error'] = 'DATA_NOT_FOUND_ERROR';
         }
 

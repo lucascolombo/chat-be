@@ -8,6 +8,10 @@ use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use App\Lib\Encrypt;
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
 final class UserRepository
 {
   private $container;
@@ -27,7 +31,7 @@ final class UserRepository
     return null;
   }
 
-  public function getUserByEmail(string $email): User {
+  public function getUserByEmail($email) {
     $pdo = $this->container->get('db');
     $stmt = $pdo->prepare("SELECT * FROM employee_details WHERE employee_mail=?");
     $stmt->execute([$email]);
@@ -102,6 +106,18 @@ final class UserRepository
     return $stmt->execute([$companyId, $userId]); 
   }
 
+  public function changePassword($userId, $password) {
+    $message = [ 'success' => false ];
+
+    $new_password = password_hash($password, PASSWORD_DEFAULT);
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->prepare("UPDATE employee_details SET employee_password = ? WHERE employee_id = ?");
+    $message['success'] = $stmt->execute([$new_password, $userId]);
+
+    return $message;
+  }
+
   public function acceptCompanyInvitations($userId, $companyId) {
     $pdo = $this->container->get('db');
 
@@ -115,5 +131,98 @@ final class UserRepository
     $stmt = $pdo->prepare("UPDATE company_invitations SET invitations_accept = ? WHERE invitations_company_id = ? AND invitations_employee_id = ?");
     
     return $stmt->execute([time(), $companyId, $userId]); 
+  }
+
+  public function recoverPassword($email) {
+    $message = [ "success" => true ];
+
+    $user = $this->getUserByEmail($email);
+
+    if ($user) {
+      $pdo = $this->container->get('db');
+      $nome = $this->getUserNameById($user->getId());
+
+      $hash = null;
+      $exists = true;
+      while ($exists) {
+        $hash = bin2hex(random_bytes(16));
+        
+        $stmt = $pdo->query("
+          SELECT 1
+          FROM employee_forgot_password
+          WHERE id = '$hash'
+        ");
+
+        $exists = $stmt->fetch();
+      }
+
+      $message["hash"] = $hash;
+
+      $stmt = $pdo->query("
+        UPDATE employee_forgot_password 
+        SET expired = 1 
+        WHERE employee_id = '" . $user->getId() . "'
+      ");
+
+      $stmt = $pdo->query("
+        INSERT INTO employee_forgot_password (id, time, employee_id)
+        VALUES ('" . $hash . "', '" . time() . "', '" . $user->getId() . "')
+      ");
+
+      $mail = new PHPMailer(true);
+      $mail->isSMTP();
+      $mail->Host       = 'smtp.mail.me.com';
+      $mail->SMTPAuth   = true;
+      $mail->Username   = 'rael.rogowski@icloud.com';
+      $mail->Password   = 'ezea-ffux-fmfs-nspk';
+      $mail->SMTPSecure = 'tls';
+      $mail->SMTPKeepAlive = true;
+      $mail->Port       = 587;
+
+      $mail->setFrom('multichat@multichat.app.br', 'MultiChat');
+      $mail->addAddress($email);
+      $mail->addReplyTo('no-reply@multichat.app.br', 'MultiChat');
+      $mail->isHTML(true);
+      $mail->Subject = "MultiChat | Esqueci minha senha";
+      $mail->Body = "Olá {$nome},<br /> você solicitou o email de esqueci minha senha.<br /><br />Para alterar sua senha clique em <a href='https://multichat.app.br/recover-password/{$hash}' target='_blank'>https://multichat.app.br/recover-password/{$hash}</a>.";
+      $mail->send();
+    }
+
+    return $message;
+  }
+
+  public function recoverUpdatePassword($hash, $password) {
+    $message = [ "success" => false ];
+
+    if ($hash && $password) {
+      $pdo = $this->container->get('db');
+      $timeLimit = time() - 30 * 60;
+      
+      $stmt = $pdo->query("
+        SELECT employee_id
+        FROM employee_forgot_password
+        WHERE id = '$hash'
+        AND time >= '$timeLimit'
+        AND expired = 0
+      ");
+      $fetch = $stmt->fetch();
+
+      if ($fetch) {
+        $employee_id = $fetch["employee_id"];
+
+        $this->changePassword($employee_id, $password);
+
+        $pdo = $this->container->get('db');
+        $stmt = $pdo->query("
+          UPDATE employee_forgot_password 
+          SET expired = 1 
+          WHERE employee_id = '" . $employee_id . "'
+        ");
+
+        $message = [ "success" => true ];
+      }
+    }
+
+    return $message;
   }
 }

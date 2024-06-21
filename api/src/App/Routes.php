@@ -78,6 +78,9 @@ $app->post('/company/edit-user', 'App\Controller\Company:editUser')->add(Auth::c
 $app->get('/company/get-users/', 'App\Controller\Company:getEmployees')->add(Auth::class)->setName('getEmployees');
 $app->get('/company/get-all-company-departments/', 'App\Controller\Company:getAllCompanyDepartments')->add(Auth::class)->setName('getAllCompanyDepartments');
 $app->get('/company/access-time/{employeeId}', 'App\Controller\Company:getUserAccessTime')->add(Auth::class)->setName('getUserAccessTime');
+$app->post('/user/update-password', 'App\Controller\User:changePassword')->add(Auth::class)->setName('changePassword');
+$app->post('/recover-password', 'App\Controller\User:recoverPassword')->setName('recoverPassword');
+$app->post('/recover-update-password', 'App\Controller\User:recoverUpdatePassword')->setName('recoverUpdatePassword');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();
