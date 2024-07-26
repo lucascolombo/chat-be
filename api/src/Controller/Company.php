@@ -398,4 +398,51 @@ final class Company
 
         return $response->withJson($companyRepository->getUserAccessTime($userId, $companyId, $employeeId));
     }
+
+    public function saveURA(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+
+        $menus = array_key_exists("menus", $body) ? $body["menus"] : [];
+        $device_id = array_key_exists("device_id", $body) ? $body["device_id"] : '';
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->saveURA($userId, $companyId, $menus, $device_id));
+    }
+
+    public function getURA(Request $request, Response $response, array $args): Response
+    {
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+        $routeContext = RouteContext::fromRequest($request); 
+        $route = $routeContext->getRoute();
+
+        $device_id = $route->getArgument('device_id');
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->getURA($userId, $companyId, $device_id));
+    }
+
+    public function getAllDevices(Request $request, Response $response, array $args): Response
+    {
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->getAllDevices($companyId, $userId));
+    }
 }

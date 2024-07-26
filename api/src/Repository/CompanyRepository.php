@@ -998,4 +998,196 @@ final class CompanyRepository
 
     return null;
   }
+  
+  private function saveURATree($menu, $companyId, $fatherId, $device_id) {
+    $pdo = $this->container->get('db');
+
+    $order = $menu["id"];
+    $footer = $menu["footer"];
+    $message_text = $menu["content"];
+    $title = $menu["header"];
+    $ura_name = $menu["name"];
+
+    $stmt = $pdo->prepare("
+      INSERT INTO company_URA (
+        company_id, 
+        device_id, 
+        URA_name,
+        message_text,
+        title,
+        footer,
+        URA_order,
+        father_id,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->execute([$companyId, $device_id, $ura_name, $message_text, $title, $footer, $order, $fatherId, time()]);
+    $newFatherId = $pdo->lastInsertId();
+      
+    if (count($menu["buttons"]) > 0) {
+      foreach($menu["buttons"] as $button) {
+        $label = $button["name"];
+        $type = $button["type"] . "";
+        $idObject = $button["idRelated"] . "";
+
+        $stmt = $pdo->prepare("
+          INSERT INTO company_URA_options (
+            company_URA_id, 
+            company_URA_label, 
+            company_URA_options_type,
+            company_URA_options_id_object
+          )
+          VALUES (?, ?, ?, ?)
+        ");
+        $stmt->execute([$newFatherId, $label, $type, $idObject]);
+      }
+    }
+
+    if (count($menu["children"]) > 0) {
+      foreach($menu["children"] as $child) {
+        $this->saveURATree($child, $companyId, $newFatherId, $device_id);
+      }
+    }
+  }
+
+  public function saveURA($userId, $companyId, $menus, $device_id) {
+    $message = [ 'success' => false ];
+
+    if (count($menus) > 0 && $device_id !== "") {
+      $pdo = $this->container->get('db');
+      $stmt = $pdo->query("
+        SELECT * FROM company_invitations 
+        WHERE invitations_company_id = '$companyId'
+        AND invitations_employee_id = '$userId'
+        AND invitations_accept > 0 
+        AND invitations_finish = 0
+      ");
+      $permission = $stmt->fetch();
+
+      if ($permission) {  
+        $stmt = $pdo->prepare("
+          UPDATE company_URA 
+          SET deleted = ?
+          WHERE company_id = ? 
+          AND device_id = ?
+        ");
+        $stmt->execute([time(), $companyId, $device_id]);
+
+
+        $this->saveURATree($menus[0], $companyId, 0, $device_id);
+        $message = [ 'success' => true, 'buttons' => $menus[0]["buttons"] ];
+      }
+    }
+
+    return $message;
+  }
+
+  private function buildURA($fatherId, $menus, $buttons) {
+    $tree = [];
+
+    foreach ($menus as $id => $ura) {
+        if ($ura['father_id'] == $fatherId) {
+            $tree[] = [
+              'id' => $ura['URA_order'],
+              'name' => $ura['URA_name'],
+              'content' => $ura['message_text'],
+              'header' => $ura['title'],
+              'footer' => $ura['footer'],
+              'children' => $this->buildURA($id, $menus, $buttons),
+              'buttons' => $buttons[$id] ?? []
+            ];
+        }
+    }
+
+    return $tree;
+  }
+
+  public function getURA($userId, $companyId, $device_id) {
+    $message = [ 'success' => false, 'menus' => [] ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission) {
+      $allMenus = [];
+      $allButtons = [];
+
+      $stmt = $pdo->query("
+        SELECT * FROM company_URA 
+        WHERE company_id = '$companyId'
+        AND device_id = '$device_id'
+        AND deleted = 0 
+        ORDER BY URA_order ASC
+      ");
+      $menus = $stmt->fetchAll();
+      foreach ($menus as $menu) {
+        $allMenus[$menu["id"]] = $menu;
+      }
+
+      $stmt = $pdo->query("
+        SELECT opt.* FROM company_URA_options opt
+        INNER JOIN company_URA ura ON ura.id = opt.company_URA_id
+        WHERE ura.company_id = '$companyId'
+        AND ura.device_id = '$device_id'
+        AND ura.deleted = 0
+        ORDER BY opt.company_URA_options_id
+      ");
+      $buttons = $stmt->fetchAll();
+      foreach ($buttons as $k => $button) {
+        $allButtons[$button["company_URA_id"]][] = [
+          "id" => $k,
+          "name" => $button["company_URA_label"],
+          "type" => $button["company_URA_options_type"],
+          "idRelated" => $button["company_URA_options_id_object"]
+        ];
+      }
+
+      $message = [ 'success' => true, 'menus' => $this->buildURA(0, $allMenus, $allButtons), 'buttons' => $allButtons ];
+    }
+
+    return $message;
+  }
+
+  public function getAllDevices($companyId, $userId) {
+    $message = [ 'success' => false, 'devices' => [] ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    $message = [ 'success' => false, 'devices' => [], 'permission' => $permission ];
+
+    if ($permission) {
+      $devices = [];
+
+      $stmt = $pdo->query("
+        SELECT * FROM company_devices 
+        WHERE device_company_id = '$companyId'
+        AND device_status != 2
+      ");
+      $fetch = $stmt->fetchAll();
+
+      foreach ($fetch as $single) {
+        $devices[] = ['value' => $single["device_id"], 'name' => $single["device_detail"]];
+      }
+
+      $message = [ 'success' => true, 'devices' => $devices ];
+    }
+
+    return $message;
+  }
 }

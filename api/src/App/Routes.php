@@ -81,6 +81,9 @@ $app->get('/company/access-time/{employeeId}', 'App\Controller\Company:getUserAc
 $app->post('/user/update-password', 'App\Controller\User:changePassword')->add(Auth::class)->setName('changePassword');
 $app->post('/recover-password', 'App\Controller\User:recoverPassword')->setName('recoverPassword');
 $app->post('/recover-update-password', 'App\Controller\User:recoverUpdatePassword')->setName('recoverUpdatePassword');
+$app->post('/company/save-ura', 'App\Controller\Company:saveURA')->add(Auth::class)->setName('saveURA');
+$app->get('/company/get-ura/{device_id}', 'App\Controller\Company:getURA')->add(Auth::class)->setName('getURA');
+$app->get('/company/get-devices', 'App\Controller\Company:getAllDevices')->add(Auth::class)->setName('getAllDevices');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

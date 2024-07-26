@@ -173,15 +173,15 @@ final class UserRepository
       $mail->isSMTP();
       $mail->Host       = 'smtp.mail.me.com';
       $mail->SMTPAuth   = true;
-      $mail->Username   = 'rael.rogowski@icloud.com';
-      $mail->Password   = 'ezea-ffux-fmfs-nspk';
+      $mail->Username   = 'multichat@icloud.com';
+      $mail->Password   = 'gjaz-qwfe-gtbi-qoww';
       $mail->SMTPSecure = 'tls';
       $mail->SMTPKeepAlive = true;
       $mail->Port       = 587;
 
-      $mail->setFrom('multichat@multichat.app.br', 'MultiChat');
+      $mail->setFrom('noreply@multichat.app.br', 'MultiChat');
       $mail->addAddress($email);
-      $mail->addReplyTo('no-reply@multichat.app.br', 'MultiChat');
+      $mail->addReplyTo('noreply@multichat.app.br', 'MultiChat');
       $mail->isHTML(true);
       $mail->Subject = "MultiChat | Esqueci minha senha";
       $mail->Body = "Olá {$nome},<br /> você solicitou o email de esqueci minha senha.<br /><br />Para alterar sua senha clique em <a href='https://multichat.app.br/recover-password/{$hash}' target='_blank'>https://multichat.app.br/recover-password/{$hash}</a>.";
