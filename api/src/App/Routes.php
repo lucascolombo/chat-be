@@ -84,6 +84,8 @@ $app->post('/recover-update-password', 'App\Controller\User:recoverUpdatePasswor
 $app->post('/company/save-ura', 'App\Controller\Company:saveURA')->add(Auth::class)->setName('saveURA');
 $app->get('/company/get-ura/{device_id}', 'App\Controller\Company:getURA')->add(Auth::class)->setName('getURA');
 $app->get('/company/get-devices', 'App\Controller\Company:getAllDevices')->add(Auth::class)->setName('getAllDevices');
+$app->post('/company/department', 'App\Controller\Company:updateDepartment')->add(Auth::class)->setName('updateDepartment');
+$app->post('/company/delete-department/{department_id}', 'App\Controller\Company:deleteDepartment')->add(Auth::class)->setName('deleteDepartment');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

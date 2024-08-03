@@ -219,7 +219,7 @@ final class ChatRepository
       (SELECT employee_name FROM employee_details WHERE employee_id = cco.chat_standby) as queue_user,
       (SELECT GROUP_CONCAT(tag_id) FROM `client_tags_selected` WHERE chat_id = cco.chat_id) as tags,
       (SELECT COUNT(*) FROM clients_messages WHERE client_id = cco.client_id AND schedule_message > 0 AND message_created > UNIX_TIMESTAMP() AND message_id_external = '0' AND schedule_DeletedBy = '0' AND schedule_SentEarly = '0') as schedule_messages_count,
-      (SELECT COUNT(*) FROM clients_messages WHERE chat_id = cco.chat_id AND message_status IN ('RECEIVED')) as count,
+      (SELECT COUNT(*) FROM clients_messages WHERE client_id = cco.client_id AND message_status IN ('RECEIVED') AND who_sent = 0) as count,
       ccs.status_type,
       ccs.status_label,
       ccs.status_date_validity,
@@ -739,10 +739,11 @@ final class ChatRepository
         UPDATE clients_messages
         SET message_status = 'READ', 
         message_status_time = ? 
-        WHERE chat_id = ?
+        WHERE client_id = ?
         AND who_sent = 0
       ");
-      $stmt->execute([$datetime, $lastChat["chat_id"]]);
+
+      $stmt->execute([$datetime, $id]);
 
       $this->updateMarkUnread($lastChat["chat_id"], 0);
 
@@ -1042,6 +1043,23 @@ final class ChatRepository
     return $message;
   }
 
+  private function fixBrazilianPhone($phone) {
+    if (substr($phone, 0, 2) === "55") { // Verifica se o número começa com "55" do brasil
+        $tamanho = strlen($phone);
+        if ($tamanho === 12) { // Verifica se o número possui 12 caracteres
+            $ddd = substr($phone, 0, 4); // Obtém os 4 primeiros dígitos como DDD
+            $numero = substr($phone, 4); // Obtém o número sem DDI e DDD.
+            $quintoDigito = substr($phone, 4, 1); // Obtém o quinto dígito
+
+            // Apenas celular começa com 97, 98, 99. Fixos não têm 9 extra.
+            if ($quintoDigito >= 7 && $quintoDigito <= 9) { // Verifica se o quinto dígito é 7, 8 ou 9
+                $phone = $ddd . "9" . $numero; // Adiciona um "9" antes do restante do número
+            }
+        }
+    }
+    return $phone;
+}
+
   public function newChat($companyId, $name, $phone, $country, $setor, $userId) {
     $message = [ 'success' => false ];
 
@@ -1053,7 +1071,7 @@ final class ChatRepository
         $setor !== ""
       ) {
       $pdo = $this->container->get('db');
-      $client_phone = $country . $phone;
+      $client_phone = $this->fixBrazilianPhone($country . $phone);
       $mensagem_log = "";
 
       $stmt = $pdo->query("
@@ -1064,7 +1082,7 @@ final class ChatRepository
       $employee = $stmt->fetch();
       $usuario = $employee['employee_name'];
 
-      // TODO: add column device_id for serach per device in the future
+      // TODO: add column device_id for search per device in the future
       $stmt = $pdo->query("
         SELECT *, count(*) as c FROM clients_registered_details
         WHERE client_phone = '$client_phone'

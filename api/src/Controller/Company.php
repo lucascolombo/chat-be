@@ -445,4 +445,39 @@ final class Company
 
         return $response->withJson($companyRepository->getAllDevices($companyId, $userId));
     }
+
+    public function updateDepartment(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        $body = $request->getParsedBody();
+
+        $department = array_key_exists("department", $body) ? $body["department"] : [];
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->updateDepartment($companyId, $userId, $department));
+    }
+
+    public function deleteDepartment(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request); 
+        $route = $routeContext->getRoute();
+
+        $departmentId = $route->getArgument('department_id');
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->deleteDepartment($companyId, $userId, $departmentId));
+    }
 }

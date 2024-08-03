@@ -738,9 +738,10 @@ final class CompanyRepository
     $pdo = $this->container->get('db');
 
     $stmt = $pdo->query("
-        SELECT cd.departments_id, cd.departments_name
+        SELECT cd.departments_id, cd.departments_name, cd.departments_device_id
         FROM company_departments cd
         WHERE cd.departments_company_id = '$companyId'
+        AND cd.departments_finish = 0
         ORDER BY cd.departments_orderby, cd.departments_name
     ");
     $fetch = $stmt->fetchAll();
@@ -750,6 +751,7 @@ final class CompanyRepository
       $element = [];
       $element["value"] = $single["departments_id"];
       $element["name"] = $single["departments_name"];
+      $element["device_id"] = $single["departments_device_id"];
       $arr[] = $element;
     }
 
@@ -1169,8 +1171,6 @@ final class CompanyRepository
     ");
     $permission = $stmt->fetch();
 
-    $message = [ 'success' => false, 'devices' => [], 'permission' => $permission ];
-
     if ($permission) {
       $devices = [];
 
@@ -1186,6 +1186,100 @@ final class CompanyRepository
       }
 
       $message = [ 'success' => true, 'devices' => $devices ];
+    }
+
+    return $message;
+  }
+
+  public function updateDepartment($companyId, $userId, $department) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission) {
+      if ($department['action'] === 'create' &&  $department['name'] !== '' &&  $department['device_id'] !== '') {
+        $stmt = $pdo->prepare("
+          INSERT INTO company_departments (
+            departments_name, 
+            departments_company_id,
+            departments_device_id,
+            departments_create
+          )
+          VALUES (?, ?, ?, ?)
+        ");
+        $stmt->execute([$department['name'], $companyId, $department['device_id'], time()]);
+
+        $message = [ 'success' => true ];
+      }
+      else if ($department['action'] === 'update' && $department['id'] !== '' && $department['name'] !== '' && $department['device_id']) {
+        $stmt = $pdo->prepare("
+          UPDATE company_departments SET 
+          departments_name = ?,
+          departments_device_id = ?
+          WHERE departments_id = ?
+        ");
+        $stmt->execute([$department['name'], $department['device_id'], $department['id']]);
+
+        $message = [ 'success' => true ];
+      }
+    }
+
+    return $message;
+  }
+
+  public function deleteDepartment($companyId, $userId, $departmentId) {
+    $message = [ 'success' => false, 'message' => '' ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission) {
+      $stmt = $pdo->query("
+        SELECT uraOpt.* FROM company_URA_options  uraOpt
+        INNER JOIN company_URA ura ON ura.id = uraOpt.company_URA_id
+        WHERE uraOpt.company_URA_options_type = '2'
+        AND uraOpt.company_URA_options_id_object = '$departmentId'
+        AND ura.deleted = 0
+        AND ura.company_id = '$companyId'
+      ");
+      $fetch = $stmt->fetchAll();
+
+      if (count($fetch) > 0) {
+        $message = [ 'success' => false, 'message' => 'Não é possível remover este departamento pois ele faz parte de uma URA ativa.' ];
+      }
+      else {
+        $stmt = $pdo->prepare("
+          UPDATE company_departments 
+          SET departments_finish = ?
+          WHERE departments_id = ?
+        ");
+        $stmt->execute([time(), $departmentId]);
+
+        $stmt = $pdo->prepare("
+          UPDATE employee_departments 
+          SET employee_departments_finishDate = ?,
+            employee_departments_finishBy = ?
+          WHERE employee_departments_departmentID = ?
+        ");
+        $stmt->execute([time(), $userId, $departmentId]);
+
+        $message = [ 'success' => true, 'message' => '' ];
+      }
     }
 
     return $message;
