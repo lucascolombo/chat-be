@@ -150,11 +150,12 @@ final class Chat
         $phone = array_key_exists("phone", $body) ? $body["phone"] : "";
         $country = array_key_exists("country", $body) ? $body["country"] : "";
         $setor = array_key_exists("setor", $body) ? $body["setor"] : "";
+        $device_id = array_key_exists("device_id", $body) ? $body["device_id"] : "";
         $companyId = $user->getCompanyId();
 
         $chatRepository = new ChatRepository($this->container);
 
-        return $response->withJson($chatRepository->newChat($companyId, $name, $phone, $country, $setor, $userId));
+        return $response->withJson($chatRepository->newChat($companyId, $name, $phone, $country, $setor, $userId, $device_id));
     }
 
     public function markAsRead(Request $request, Response $response): Response

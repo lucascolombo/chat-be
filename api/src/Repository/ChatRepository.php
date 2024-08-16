@@ -6,6 +6,7 @@ use Pimple\Psr11\Container;
 use App\Lib\Chat;
 use Slim\Psr7\UploadedFile;
 use App\Repository\UserRepository;
+use App\Lib\CryptContent;
 
 class SendSimpleText { 
   private $instancia; 
@@ -51,17 +52,13 @@ class SendSimpleText {
       ));
   
       $response = curl_exec($client);
-      $err = curl_error($client);
+      if (curl_error($client)) return null;
+
       $MessageID = json_decode($response);
       $MessageID = $MessageID->messageId;
-  
       curl_close($client);
   
-      if (strpos($response, 'erro') !== false) { 
-        return null;
-      } else { 
-        return $MessageID; 
-      }
+      return $MessageID;
   }
 }
 
@@ -125,18 +122,15 @@ class SendMedia {
           "content-Type: application/json"
         ),
       ));
-  
+
       $response = curl_exec($client);
-      $err = curl_error($client);
+      if (curl_error($client)) return null;
+
       $MessageID = json_decode($response);
       $MessageID = $MessageID->messageId;
       curl_close($client);
   
-      if (strpos($response, 'error') !== false) {
-        return null;
-      } else {
-        return $MessageID;
-      }
+      return $MessageID;
   }
 }
 
@@ -256,8 +250,13 @@ final class ChatRepository
     $fetch = $stmt->fetchAll();
     $arr = [];
 
+    $security = new CryptContent($company);
+
     foreach ($fetch as $single) {
       $element = $single;
+      $decrypt = $security->decrypt($element['last_message']);
+
+      $element['last_message'] = !$decrypt ? $element['last_message'] : $decrypt;
       $element["last_time"] = date("d/m H:i", $element["last_time"]);
       $element["status_date_validity"] = date("d/m/Y H:i", $element["status_date_validity"]);
       $arr[] = $element;
@@ -353,8 +352,12 @@ final class ChatRepository
         cm.message_deleted_date,
         cm.message_edited_date,
         cm.message_reaction,
-        cm.sent_from
+        cm.sent_from,
+        cm.sendError,
+        cd.device_status
       FROM clients_messages cm
+      INNER JOIN clients_chats_opened cco ON cco.chat_id = cm.chat_id
+      INNER JOIN company_devices cd ON cd.device_id = cco.device_id
       LEFT JOIN employee_details ed ON ed.employee_id = cm.who_sent
       WHERE cm.client_id = '$id'
       AND cm.system_log_hidden <= 0
@@ -373,12 +376,17 @@ final class ChatRepository
 
     $arr = [];
 
+    $security = new CryptContent($companyId);
+
     foreach ($fetch as $single) {
       $element = $single;
+      $decrypt = $security->decrypt($element['message']);
+
       $element["datetime"] = date("d/m/Y H:i:s", $element["message_created"]);
       $element["datetime_deleted"] = date("d/m/Y H:i:s", $element["message_deleted_date"]);
       $element["datetime_edited"] = date("d/m/Y H:i:s", $element["message_edited_date"]);
-      //$element["message"] = utf8mb4_encode($element["message"]);
+      $element['message'] = !$decrypt ? $element['message'] : $decrypt;
+
       $arr[] = $element;
     }
 
@@ -482,6 +490,9 @@ final class ChatRepository
     $department_id = $lastChat['chat_department_id'];
     $device_id = $lastChat['device_id'];
     $who_sent = $userId;
+
+    $security = new CryptContent($company_id);
+    $message = $security->encrypt($message);
 
     $stmt = $pdo->prepare("
       INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
@@ -617,11 +628,15 @@ final class ChatRepository
 
       $newChatId = $pdo->lastInsertId();
 
+      $messageTypeDetail = "Atendimento Transferido por $usuario para o Departamento $departamento.";
+      $security = new CryptContent($companyId);
+      $messageTypeDetail = $security->encrypt($messageTypeDetail);
+
       $stmt = $pdo->prepare("
         INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ");
-      $stmt->execute([$newChatId, $id, $lastChat['client_phone'], $companyId, $setor, $userId, 'SENT-DEVICE', $datetime, $datetime, "Atendimento Transferido por $usuario para o Departamento $departamento.", $lastChat['device_id'], '1']);
+      $stmt->execute([$newChatId, $id, $lastChat['client_phone'], $companyId, $setor, $userId, 'SENT-DEVICE', $datetime, $datetime, $messageTypeDetail, $lastChat['device_id'], '1']);
       
       $message["success"] = true;
     }
@@ -684,11 +699,15 @@ final class ChatRepository
 
       $newChatId = $pdo->lastInsertId();
 
+      $messageTypeDetail = "Atendimento Transferido por $usuario para $usuario_transferido.";
+      $security = new CryptContent($companyId);
+      $messageTypeDetail = $security->encrypt($messageTypeDetail);
+
       $stmt = $pdo->prepare("
         INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ");
-      $stmt->execute([$newChatId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, $datetime, "Atendimento Transferido por $usuario para $usuario_transferido.", $lastChat['device_id'], '1']);
+      $stmt->execute([$newChatId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, $datetime, $messageTypeDetail, $lastChat['device_id'], '1']);
       
       $message["success"] = true;
     }
@@ -851,6 +870,14 @@ final class ChatRepository
       ");
       $stmt->execute([$messageExternalId, $messageId]);
     }
+    else {
+      $stmt = $pdo->prepare("
+        UPDATE clients_messages
+        SET sendError = ?
+        WHERE message_id = ?
+      ");
+      $stmt->execute(['1', $messageId]);
+    }
 
     $message['success'] = true;
 
@@ -893,6 +920,9 @@ final class ChatRepository
       $status = $device["status"];
 
       if (trim($text) != "") {
+        $security = new CryptContent($companyId);
+        $text = $security->encrypt($text);
+
         $stmt = $pdo->prepare("
           INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, message_type, schedule_message) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -993,10 +1023,13 @@ final class ChatRepository
 
     foreach ($fetch as $single) {
       $element = $single;
+      $security = new CryptContent($element['company_id']);
+      $decrypt = $security->decrypt($element['message_type_detail']);
       // message_created é a data em que a mensagem vai entrar no chat então é a data agendada
       // schedule_message é a data em que o agendamento foi criado apenas para diferenciar de 0 e registrar
       $element["datetime_schedule"] = date("d/m/Y H:i:s", $element["message_created"]);
       $element["datetime"] = date("d/m/Y H:i:s", $element["schedule_message"]);
+      $element['message_type_detail'] = !$decrypt ? $element['message_type_detail'] : $decrypt;
       $arr[] = $element;
     }
 
@@ -1060,7 +1093,7 @@ final class ChatRepository
     return $phone;
 }
 
-  public function newChat($companyId, $name, $phone, $country, $setor, $userId) {
+  public function newChat($companyId, $name, $phone, $country, $setor, $userId, $device_id) {
     $message = [ 'success' => false ];
 
     if (
@@ -1068,10 +1101,14 @@ final class ChatRepository
         $name !== "" && 
         $phone !== "" && 
         $country !== "" && 
-        $setor !== ""
+        $setor !== "" &&
+        $device_id !== ""
       ) {
       $pdo = $this->container->get('db');
       $client_phone = $this->fixBrazilianPhone($country . $phone);
+
+      $message['phone'] = $client_phone;
+
       $mensagem_log = "";
 
       $stmt = $pdo->query("
@@ -1082,7 +1119,6 @@ final class ChatRepository
       $employee = $stmt->fetch();
       $usuario = $employee['employee_name'];
 
-      // TODO: add column device_id for search per device in the future
       $stmt = $pdo->query("
         SELECT *, count(*) as c FROM clients_registered_details
         WHERE client_phone = '$client_phone'
@@ -1098,9 +1134,6 @@ final class ChatRepository
       $client = $stmt->fetch();
 
       if ($client['c'] == 0) {
-        // TODO: get device id from body
-        $device_id = "9";
-
         $stmt = $pdo->prepare("
           INSERT INTO clients_registered_details (client_phone, client_name, company_id, device_id) 
           VALUES (?, ?, ?, ?)
@@ -1113,7 +1146,6 @@ final class ChatRepository
       }
       else {
         $client_id = $client['client_id'];
-        $device_id = $client['device_id'];
 
         $mensagem_log = "$usuario tentou cadastrar este cliente novamente.";
       }
@@ -1143,6 +1175,9 @@ final class ChatRepository
         $message['clientId'] = $client_id;
         $lastChatId = $pdo->lastInsertId();
       }
+
+      $security = new CryptContent($companyId);
+      $mensagem_log = $security->encrypt($mensagem_log);
 
       $stmt = $pdo->prepare("
         INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 

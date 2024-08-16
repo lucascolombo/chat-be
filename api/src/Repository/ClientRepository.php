@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use Pimple\Psr11\Container;
+use App\Lib\CryptContent;
 
 final class ClientRepository
 {
@@ -59,11 +60,15 @@ final class ClientRepository
       ");
       $stmt->execute([$datetime, $id]);
 
+      $messageTypeDetail = "Atendimento Finalizado por $usuario";
+      $security = new CryptContent($companyId);
+      $messageTypeDetail = $security->encrypt($messageTypeDetail);
+
       $stmt = $pdo->prepare("
         INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ");
-      $stmt->execute([$lastChat['chat_id'], $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, $datetime, "Atendimento Finalizado por $usuario", $lastChat['device_id'], '1']);
+      $stmt->execute([$lastChat['chat_id'], $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, $datetime, $messageTypeDetail, $lastChat['device_id'], '1']);
       
       $standBy = $lastChat['chat_standby'];
 
@@ -120,11 +125,15 @@ final class ClientRepository
 
       $newChatId = $pdo->lastInsertId();
 
+      $messageTypeDetail = "Atendimento Iniciado por $usuario";
+      $security = new CryptContent($companyId);
+      $messageTypeDetail = $security->encrypt($messageTypeDetail);
+
       $stmt = $pdo->prepare("
         INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ");
-      $stmt->execute([$newChatId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, $datetime, "Atendimento Iniciado por $usuario", $lastChat['device_id'], '1']);
+      $stmt->execute([$newChatId, $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT-DEVICE', $datetime, $datetime, $messageTypeDetail, $lastChat['device_id'], '1']);
 
 
       $message["success"] = true;

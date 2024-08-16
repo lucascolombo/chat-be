@@ -1182,7 +1182,11 @@ final class CompanyRepository
       $fetch = $stmt->fetchAll();
 
       foreach ($fetch as $single) {
-        $devices[] = ['value' => $single["device_id"], 'name' => $single["device_detail"]];
+        $devices[] = [
+          'value' => $single["device_id"], 
+          'name' => $single["device_detail"], 
+          'status' => $single["device_status"]
+        ];
       }
 
       $message = [ 'success' => true, 'devices' => $devices ];
