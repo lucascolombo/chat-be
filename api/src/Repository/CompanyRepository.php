@@ -1001,7 +1001,7 @@ final class CompanyRepository
     return null;
   }
   
-  private function saveURATree($menu, $companyId, $fatherId, $device_id) {
+  private function saveURATree($menu, $companyId, $fatherId, $device_id, &$btns2Fix) {
     $pdo = $this->container->get('db');
 
     $order = $menu["id"];
@@ -1026,6 +1026,7 @@ final class CompanyRepository
     ");
     $stmt->execute([$companyId, $device_id, $ura_name, $message_text, $title, $footer, $order, $fatherId, time()]);
     $newFatherId = $pdo->lastInsertId();
+    $btns2Fix[$menu["id"]] = $newFatherId;
       
     if (count($menu["buttons"]) > 0) {
       foreach($menu["buttons"] as $button) {
@@ -1048,7 +1049,7 @@ final class CompanyRepository
 
     if (count($menu["children"]) > 0) {
       foreach($menu["children"] as $child) {
-        $this->saveURATree($child, $companyId, $newFatherId, $device_id);
+        $this->saveURATree($child, $companyId, $newFatherId, $device_id, $btns2Fix);
       }
     }
   }
@@ -1076,9 +1077,35 @@ final class CompanyRepository
         ");
         $stmt->execute([time(), $companyId, $device_id]);
 
+        $btns2Fix = [];
+        $this->saveURATree($menus[0], $companyId, 0, $device_id, $btns2Fix);
 
-        $this->saveURATree($menus[0], $companyId, 0, $device_id);
-        $message = [ 'success' => true, 'buttons' => $menus[0]["buttons"] ];
+        // fix all arrays in button related to menus
+        $stmt = $pdo->query("
+          SELECT opt.* FROM company_URA_options opt
+          INNER JOIN company_URA ura ON ura.id = opt.company_URA_id
+          WHERE ura.company_id = '$companyId'
+          AND ura.device_id = '$device_id'
+          AND ura.deleted = 0
+          AND opt.company_URA_options_type = '3'
+        ");
+        $buttons = $stmt->fetchAll();
+        foreach ($buttons as $button) {
+          $id = $button['company_URA_options_id'];
+          $key = $button['company_URA_options_id_object'];
+
+          if (isset($btns2Fix[$key])) {
+            $stmt = $pdo->prepare("
+              UPDATE company_URA_options 
+              SET company_URA_options_id_object = ?
+              WHERE company_URA_options_id = ? 
+            ");
+            $stmt->execute([$btns2Fix[$key], $id]);
+          }
+        }
+        // end fix all arrays in button related to menus
+
+        $message = [ 'success' => true, 'buttons' => $btns2Fix ];
       }
     }
 
@@ -1091,7 +1118,7 @@ final class CompanyRepository
     foreach ($menus as $id => $ura) {
         if ($ura['father_id'] == $fatherId) {
             $tree[] = [
-              'id' => $ura['URA_order'],
+              'id' => $ura['id'],
               'name' => $ura['URA_name'],
               'content' => $ura['message_text'],
               'header' => $ura['title'],
