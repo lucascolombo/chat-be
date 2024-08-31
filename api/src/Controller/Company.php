@@ -480,4 +480,32 @@ final class Company
 
         return $response->withJson($companyRepository->deleteDepartment($companyId, $userId, $departmentId));
     }
+
+    public function getAllCompanyTags(Request $request, Response $response, array $args): Response
+    {
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->getAllCompanyTags($companyId, $userId));
+    }
+
+    public function saveCompanyTags(Request $request, Response $response, array $args): Response
+    {
+        $body = $request->getParsedBody();
+
+        $groups = array_key_exists("groups", $body) ? $body["groups"] : [];
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->saveCompanyTags($companyId, $userId, $groups));
+    }
 }

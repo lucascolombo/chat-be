@@ -98,7 +98,8 @@ final class CompanyRepository
     $stmt = $pdo->query("
         SELECT ct.id,
             ct.tag_name,
-            IFNULL(ctg.group_name, 'Tags') as group_name
+            IFNULL(ctg.group_name, 'Tags') as group_name,
+            IFNULL(ctg.group_type, 0) as group_type
         FROM company_tagList ct
         LEFT JOIN company_tagGroup ctg ON ctg.group_id = ct.group_id
         WHERE ct.company_id = '$companyId'
@@ -118,6 +119,7 @@ final class CompanyRepository
       $element = [];
       $element["value"] = $single["id"];
       $element["name"] = $single["group_name"] . " > " . $single["tag_name"];
+      $element["group_type"] = $single["group_type"];
       $arr[] = $element;
     }
 
@@ -1311,6 +1313,137 @@ final class CompanyRepository
 
         $message = [ 'success' => true, 'message' => '' ];
       }
+    }
+
+    return $message;
+  }
+
+  public function getAllCompanyTags($companyId, $userId) {
+    $message = [ 'success' => false, 'groups' => [] ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission) {
+      $stmt = $pdo->query("
+        SELECT * FROM company_tagGroup
+        WHERE company_id = '$companyId'
+        AND group_finish = '0'
+        ORDER BY group_orderby ASC
+      ");
+      $fetch = $stmt->fetchAll();
+      $arr = [];
+
+      foreach ($fetch as $single) {
+        $groupId = $single["group_id"];
+        $children = [];
+
+        $stmtTags = $pdo->query("
+          SELECT * FROM company_tagList
+          WHERE company_id = '$companyId'
+          AND group_id = '$groupId'
+          AND tag_finish = '0'
+          ORDER BY tag_orderby ASC
+        ");
+        $fetchTags = $stmtTags->fetchAll();
+        foreach ($fetchTags as $tag) {
+          $children[] = [
+            "id" => $tag["tag_orderby"],
+            "tagId" => $tag["id"],
+            "name" => $tag["tag_name"],
+          ];
+        }
+
+        $arr[] = [
+          "id" => $single["group_orderby"],
+          "groupId" => $groupId,
+          "name" => $single["group_name"],
+          "funil" => $single["group_type"],
+          "children" => $children
+        ];
+      }
+
+      $message["success"] = true;
+      $message["groups"] = $arr;
+    }
+
+    return $message;
+  }
+
+  public function saveCompanyTags($companyId, $userId, $groups) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission) {
+      foreach ($groups as $key => $single) {
+        $groupId = $single["groupId"];
+        $order = $key;
+        $name = $single["name"];
+        $funil = $single["funil"];
+        $children = $single["children"];
+        
+        if ($groupId == 0) {
+          $stmt = $pdo->prepare("
+            INSERT INTO company_tagGroup 
+            (company_id, group_name, group_type, group_orderby)
+            VALUES (?, ?, ?, ?)
+          ");
+          $stmt->execute([$companyId, $name, $funil, $order]);
+          $groupId = $pdo->lastInsertId();
+        }
+        else {
+          $stmt = $pdo->prepare("
+            UPDATE company_tagGroup 
+            SET group_name = ?,
+            group_type = ?,
+            group_orderby = ?
+            WHERE group_id = ?
+          ");
+          $stmt->execute([$name, $funil, $order, $groupId]);
+        }
+
+        foreach ($children as $keyTag => $tag) {
+          $tagId = $tag["tagId"];
+          $tagOrder = $keyTag;
+          $tagName = $tag["name"];
+
+          if ($tagId == 0) {
+            $stmt = $pdo->prepare("
+              INSERT INTO company_tagList 
+              (company_id, group_id, tag_name, tag_orderby)
+              VALUES (?, ?, ?, ?)
+            ");
+            $stmt->execute([$companyId, $groupId, $tagName, $tagOrder]);
+          }
+          else {
+            $stmt = $pdo->prepare("
+              UPDATE company_tagList 
+              SET tag_name = ?,
+              tag_orderby = ?
+              WHERE id = ?
+            ");
+            $stmt->execute([$tagName, $tagOrder, $tagId]);
+          }
+        }
+      }
+
+      $message["success"] = true;
     }
 
     return $message;

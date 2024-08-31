@@ -8,6 +8,41 @@ use Slim\Psr7\UploadedFile;
 use App\Repository\UserRepository;
 use App\Lib\CryptContent;
 
+class CheckClientPhone {
+  private $instancia; 
+  private $token; 
+  private $phone;
+
+  public function __construct($instancia, $token, $phone){
+    $this->instancia = $instancia;
+    $this->token = $token; 
+    $this->phone = $phone;
+  }
+
+  public function checkClientPhone() {
+    $client = curl_init("https://api.z-api.io/instances/".$this->instancia."/token/".$this->token."/phone-exists/".$this->phone."");
+
+    curl_setopt($client, CURLOPT_CUSTOMREQUEST, 'GET');
+    curl_setopt($client, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($client, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($client, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($client, CURLOPT_TIMEOUT, 3);
+    curl_setopt($client, CURLOPT_HTTPHEADER, array(
+    "client-token: F10e75314314549299f7236a6f2ac8c5fS",
+    "content-type: application/json"
+    ));
+
+    $response = curl_exec($client);
+
+    if (curl_error($client)) return null;
+    curl_close($client);
+
+    $data = json_decode($response);
+
+    return $data->exists;
+  }
+}
+
 class SendSimpleText { 
   private $instancia; 
   private $token; 
@@ -1094,7 +1129,7 @@ final class ChatRepository
 }
 
   public function newChat($companyId, $name, $phone, $country, $setor, $userId, $device_id) {
-    $message = [ 'success' => false ];
+    $message = [ 'success' => false, 'message' => 'Não foi possível criar a conversa.' ];
 
     if (
         $companyId &&
@@ -1107,85 +1142,103 @@ final class ChatRepository
       $pdo = $this->container->get('db');
       $client_phone = $this->fixBrazilianPhone($country . $phone);
 
-      $message['phone'] = $client_phone;
-
-      $mensagem_log = "";
-
       $stmt = $pdo->query("
-        SELECT employee_name
-        FROM employee_details
-        WHERE employee_id = '$userId'
+        SELECT 
+          device_login as instancia, 
+          device_pass as token,
+          device_status as status
+        FROM company_devices WHERE device_id = '$device_id' 
       ");
-      $employee = $stmt->fetch();
-      $usuario = $employee['employee_name'];
+      $device = $stmt->fetch();
+      $instancia = $device["instancia"];
+      $token = $device["token"];
 
-      $stmt = $pdo->query("
-        SELECT *, count(*) as c FROM clients_registered_details
-        WHERE client_phone = '$client_phone'
-        AND company_id = '$companyId'
-        AND company_id IN (
-          SELECT invitations_company_id
-          FROM company_invitations 
-          WHERE invitations_employee_id = '$userId'
-          AND invitations_accept > 0 
-          AND invitations_finish = 0
-        )
-      ");
-      $client = $stmt->fetch();
+      $validate = new CheckClientPhone($instancia, $token, $client_phone);
+      $check = $validate->checkClientPhone();
 
-      if ($client['c'] == 0) {
-        $stmt = $pdo->prepare("
-          INSERT INTO clients_registered_details (client_phone, client_name, company_id, device_id) 
-          VALUES (?, ?, ?, ?)
+      if ($check === null || $check) {
+        $mensagem_log = "";
+
+        $stmt = $pdo->query("
+          SELECT employee_name
+          FROM employee_details
+          WHERE employee_id = '$userId'
         ");
-        $stmt->execute([$client_phone, $name, $companyId, $device_id]);
-        $newChatId = $pdo->lastInsertId();
-        $client_id = $newChatId;
+        $employee = $stmt->fetch();
+        $usuario = $employee['employee_name'];
 
-        $mensagem_log = "Cliente Cadastrado por $usuario.";
+        $stmt = $pdo->query("
+          SELECT *, count(*) as c FROM clients_registered_details
+          WHERE client_phone = '$client_phone'
+          AND company_id = '$companyId'
+          AND company_id IN (
+            SELECT invitations_company_id
+            FROM company_invitations 
+            WHERE invitations_employee_id = '$userId'
+            AND invitations_accept > 0 
+            AND invitations_finish = 0
+          )
+        ");
+        $client = $stmt->fetch();
+
+        if ($client['c'] == 0) {
+          $stmt = $pdo->prepare("
+            INSERT INTO clients_registered_details (client_phone, client_name, company_id, device_id) 
+            VALUES (?, ?, ?, ?)
+          ");
+          $stmt->execute([$client_phone, $name, $companyId, $device_id]);
+          $newChatId = $pdo->lastInsertId();
+          $client_id = $newChatId;
+
+          $mensagem_log = "Cliente Cadastrado por $usuario.";
+        }
+        else {
+          $client_id = $client['client_id'];
+
+          $mensagem_log = "$usuario tentou cadastrar este cliente novamente.";
+        }
+
+        $stmt = $pdo->query("
+          SELECT *, count(*) as c
+          FROM clients_chats_opened cco
+          WHERE cco.chat_date_close = 0
+          AND cco.chat_date_start > 0
+          AND cco.company_id = '$companyId'
+          AND cco.client_phone = '$client_phone'
+          ORDER BY cco.chat_id DESC
+          LIMIT 1
+        ");
+        $lastChat = $stmt->fetch();
+        $lastChatId = $lastChat["chat_id"];
+
+        if ($lastChat['c'] > 0) {
+          $message['clientId'] = $client_id;
+        }
+        else {
+          $stmt = $pdo->prepare("
+            INSERT INTO clients_chats_opened (who_start, company_id, device_id, client_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, ura_status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ");
+          $stmt->execute(["1", $companyId, $device_id, $client_id, $client_phone, time(), $setor, $userId, "1"]);
+          $message['clientId'] = $client_id;
+          $lastChatId = $pdo->lastInsertId();
+        }
+
+        $security = new CryptContent($companyId);
+        $mensagem_log = $security->encrypt($mensagem_log);
+
+        $stmt = $pdo->prepare("
+          INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$lastChatId, $client_id, $client_phone, $companyId, $setor, $userId, 'SENT-DEVICE', time(), time(), $mensagem_log, $device_id, '1']);
+
+        $message["success"] = true;
+        $message["message"] = "";
       }
       else {
-        $client_id = $client['client_id'];
-
-        $mensagem_log = "$usuario tentou cadastrar este cliente novamente.";
+        $message["message"] = 'O telefone não está cadastrado no whatsapp.';
       }
-
-      $stmt = $pdo->query("
-        SELECT *, count(*) as c
-        FROM clients_chats_opened cco
-        WHERE cco.chat_date_close = 0
-        AND cco.chat_date_start > 0
-        AND cco.company_id = '$companyId'
-        AND cco.client_phone = '$client_phone'
-        ORDER BY cco.chat_id DESC
-        LIMIT 1
-      ");
-      $lastChat = $stmt->fetch();
-      $lastChatId = $lastChat["chat_id"];
-
-      if ($lastChat['c'] > 0) {
-        $message['clientId'] = $client_id;
-      }
-      else {
-        $stmt = $pdo->prepare("
-          INSERT INTO clients_chats_opened (who_start, company_id, device_id, client_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, ura_status) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute(["1", $companyId, $device_id, $client_id, $client_phone, time(), $setor, $userId, "1"]);
-        $message['clientId'] = $client_id;
-        $lastChatId = $pdo->lastInsertId();
-      }
-
-      $security = new CryptContent($companyId);
-      $mensagem_log = $security->encrypt($mensagem_log);
-
-      $stmt = $pdo->prepare("
-        INSERT INTO clients_messages (chat_id, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, system_log) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ");
-      $stmt->execute([$lastChatId, $client_id, $client_phone, $companyId, $setor, $userId, 'SENT-DEVICE', time(), time(), $mensagem_log, $device_id, '1']);
-
-      $message["success"] = true;
     }
 
     return $message;

@@ -86,6 +86,8 @@ $app->get('/company/get-ura/{device_id}', 'App\Controller\Company:getURA')->add(
 $app->get('/company/get-devices', 'App\Controller\Company:getAllDevices')->add(Auth::class)->setName('getAllDevices');
 $app->post('/company/department', 'App\Controller\Company:updateDepartment')->add(Auth::class)->setName('updateDepartment');
 $app->post('/company/delete-department/{department_id}', 'App\Controller\Company:deleteDepartment')->add(Auth::class)->setName('deleteDepartment');
+$app->get('/company/tags', 'App\Controller\Company:getAllCompanyTags')->add(Auth::class)->setName('getAllCompanyTags');
+$app->post('/company/tags', 'App\Controller\Company:saveCompanyTags')->add(Auth::class)->setName('saveCompanyTags');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();
