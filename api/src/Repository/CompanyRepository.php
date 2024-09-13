@@ -740,7 +740,7 @@ final class CompanyRepository
     $pdo = $this->container->get('db');
 
     $stmt = $pdo->query("
-        SELECT cd.departments_id, cd.departments_name, cd.departments_device_id
+        SELECT cd.departments_id, cd.departments_name, cd.departments_device_id, cd.restrict_access
         FROM company_departments cd
         WHERE cd.departments_company_id = '$companyId'
         AND cd.departments_finish = 0
@@ -754,6 +754,7 @@ final class CompanyRepository
       $element["value"] = $single["departments_id"];
       $element["name"] = $single["departments_name"];
       $element["device_id"] = $single["departments_device_id"];
+      $element["restrict_access"] = $single["restrict_access"];
       $arr[] = $element;
     }
 
@@ -1224,7 +1225,7 @@ final class CompanyRepository
     return $message;
   }
 
-  public function updateDepartment($companyId, $userId, $department) {
+  public function updateDepartment($companyId, $userId, $department, $activate_access, $week_hours) {
     $message = [ 'success' => false ];
 
     $pdo = $this->container->get('db');
@@ -1253,13 +1254,78 @@ final class CompanyRepository
         $message = [ 'success' => true ];
       }
       else if ($department['action'] === 'update' && $department['id'] !== '' && $department['name'] !== '' && $department['device_id']) {
+        $restrict_access = $activate_access ? 1 : 0;
+
         $stmt = $pdo->prepare("
           UPDATE company_departments SET 
           departments_name = ?,
-          departments_device_id = ?
+          departments_device_id = ?,
+          restrict_access = ?
           WHERE departments_id = ?
         ");
-        $stmt->execute([$department['name'], $department['device_id'], $department['id']]);
+        $stmt->execute([$department['name'], $department['device_id'], $restrict_access, $department['id']]);
+
+        $stmt = $pdo->prepare("
+          UPDATE permissions_department_access_time 
+          SET access_time_deletedBy = ?,
+            access_time_deletedAt = ?
+          WHERE access_time_department_id = ? 
+          AND access_time_company_id = ?
+        ");
+        $stmt->execute([$userId, time(), $department['id'], $companyId]);
+
+        $week = [
+          "Seg" => 1,
+          "Ter" => 2,
+          "Qua" => 3,
+          "Qui" => 4,
+          "Sex" => 5,
+          "Sab" => 6,
+          "Dom" => 7
+        ];
+
+        $remove_restrict_access = true;
+
+        if ($activate_access) {
+          foreach($week as $w) {
+            $stmt = $pdo->prepare("
+              INSERT INTO permissions_department_access_time (
+                access_time_department_id, 
+                access_time_company_id, 
+                access_time_work_day,
+                access_time_hour_start,
+                access_time_hour_end,
+                access_time_createdBy,
+                access_time_createdAt
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            
+            if ($week_hours[$w]["active"] && $week_hours[$w]["from"] && $week_hours[$w]["to"]) {
+              $stmt->execute([$department['id'], $companyId, $w, $week_hours[$w]["from"], $week_hours[$w]["to"],  $userId, time()]);
+              $remove_restrict_access = false;
+            }
+          }
+        }
+        else {
+          foreach($week as $w) {
+            $stmt = $pdo->prepare("
+              INSERT INTO permissions_department_access_time (
+                access_time_department_id, 
+                access_time_company_id, 
+                access_time_work_day,
+                access_time_createdBy,
+                access_time_createdAt
+              )
+              VALUES (?, ?, ?, ?, ?)
+            ");
+
+            $stmt->execute([$department['id'], $companyId, $w, $userId, time()]);
+          }
+        }
+
+        $restrict_access = $activate_access ? 1 : 0;
+        if ($remove_restrict_access) $restrict_access = 0;
 
         $message = [ 'success' => true ];
       }
@@ -1444,6 +1510,105 @@ final class CompanyRepository
       }
 
       $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function deleteTagGroup($companyId, $userId, $groupId) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission && $groupId > 0) {
+      $stmt = $pdo->prepare("
+        UPDATE company_tagGroup 
+        SET group_finish = ?
+        WHERE group_id = ?
+        AND company_id = ?
+      ");
+      $stmt->execute([time(), $groupId, $companyId]);
+
+      $stmt = $pdo->prepare("
+        UPDATE company_tagList 
+        SET tag_finish = ?
+        WHERE group_id = ?
+        AND company_id = ?
+      ");
+      $stmt->execute([time(), $groupId, $companyId]);
+
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function deleteTag($companyId, $userId, $tagId) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission && $tagId > 0) {
+      $stmt = $pdo->prepare("
+        UPDATE company_tagList 
+        SET tag_finish = ?
+        WHERE id = ?
+        AND company_id = ?
+      ");
+      $stmt->execute([time(), $tagId, $companyId]);
+
+      $message["success"] = true;
+    }
+
+    return $message;
+  }
+
+  public function getDepartmentAccessTime($userId, $companyId, $departmentId) {
+    $message = [ 'success' => false, 'access_time' => [] ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission) {  
+      $stmt = $pdo->query("
+        SELECT * 
+        FROM permissions_department_access_time 
+        WHERE access_time_department_id = '$departmentId' 
+        AND access_time_company_id = '$companyId' 
+        AND access_time_deletedAt = 0
+      ");
+      $fetch = $stmt->fetchAll();
+      $arr = [];
+
+      foreach ($fetch as $single) {
+        $element = $single;
+        $arr[] = $element;
+      }
+
+      $message = [ 'success' => true, 'access_time' => $arr ];
     }
 
     return $message;

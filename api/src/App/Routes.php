@@ -88,6 +88,10 @@ $app->post('/company/department', 'App\Controller\Company:updateDepartment')->ad
 $app->post('/company/delete-department/{department_id}', 'App\Controller\Company:deleteDepartment')->add(Auth::class)->setName('deleteDepartment');
 $app->get('/company/tags', 'App\Controller\Company:getAllCompanyTags')->add(Auth::class)->setName('getAllCompanyTags');
 $app->post('/company/tags', 'App\Controller\Company:saveCompanyTags')->add(Auth::class)->setName('saveCompanyTags');
+$app->post('/company/delete-tag-group', 'App\Controller\Company:deleteTagGroup')->add(Auth::class)->setName('deleteTagGroup');
+$app->post('/company/delete-tag', 'App\Controller\Company:deleteTag')->add(Auth::class)->setName('deleteTag');
+$app->get('/company/department-access-time/{departmentId}', 'App\Controller\Company:getDepartmentAccessTime')->add(Auth::class)->setName('getDepartmentAccessTime');
+$app->post('/audio/transcript/{message_id}', 'App\Controller\Messages:transcript')->add(Auth::class)->setName('transcript');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

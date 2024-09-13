@@ -374,9 +374,11 @@ final class ChatRepository
 
     $stmt = $pdo->query("
       SELECT 
+        cm.message_id,
         cm.message_id_external,
         cm.who_sent,
         cm.message_type_detail as message,
+        cm.message_dropdown_content,
         cm.metatags_url,
         cm.system_log,
         ed.employee_name,
@@ -389,7 +391,8 @@ final class ChatRepository
         cm.message_reaction,
         cm.sent_from,
         cm.sendError,
-        cd.device_status
+        cd.device_status,
+        cm.cron_transcript
       FROM clients_messages cm
       INNER JOIN clients_chats_opened cco ON cco.chat_id = cm.chat_id
       INNER JOIN company_devices cd ON cd.device_id = cco.device_id
@@ -421,6 +424,7 @@ final class ChatRepository
       $element["datetime_deleted"] = date("d/m/Y H:i:s", $element["message_deleted_date"]);
       $element["datetime_edited"] = date("d/m/Y H:i:s", $element["message_edited_date"]);
       $element['message'] = !$decrypt ? $element['message'] : $decrypt;
+      $element['message_dropdown_content'] = $element['message_dropdown_content'] != '0' ? $security->decrypt($element['message_dropdown_content']) : '0';
 
       $arr[] = $element;
     }
@@ -1331,6 +1335,32 @@ final class ChatRepository
     $this->insertSystemLogByChatId($lastChat["chat_id"], "$usuario marcou como não lido.", $userId);
 
     $message = [ 'success' => true ];
+
+    return $message;
+  }
+
+  public function transcript($messageId, $userId, $companyId) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission) {  
+      $stmt = $pdo->prepare("
+        UPDATE clients_messages 
+        SET cron_transcript = ?
+        WHERE message_id = ?
+      ");
+      $stmt->execute([1, $messageId]);
+      $message['success'] = true;
+    }
 
     return $message;
   }

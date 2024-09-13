@@ -269,4 +269,21 @@ final class Messages
 
         return $response->withJson($chatRepository->open($id, $userId, $companyId));
     }
+
+    public function transcript(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+        
+        $id = $route->getArgument('message_id');
+
+        $userRepository = new UserRepository($this->container);
+        $chatRepository = new ChatRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($chatRepository->transcript($id, $userId, $companyId));
+    }
 }

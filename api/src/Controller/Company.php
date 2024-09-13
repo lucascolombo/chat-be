@@ -454,6 +454,51 @@ final class Company
 
         $department = array_key_exists("department", $body) ? $body["department"] : [];
 
+        $activate_access = false;
+        $week_hours = [];
+
+        if ($department["action"] === "update") {
+            $activate_access = array_key_exists("activate_access", $department) && $department["activate_access"] ? $department["activate_access"] : false;
+
+            $activate_access_Seg = array_key_exists("activate_access_Seg", $department) && $department["activate_access_Seg"] ? $department["activate_access_Seg"] : false;
+            $from_Seg = array_key_exists("from_Seg", $department) && $department["from_Seg"] ? $department["from_Seg"] : null;
+            $to_Seg = array_key_exists("to_Seg", $department) && $department["to_Seg"] ? $department["to_Seg"] : null;
+
+            $activate_access_Ter = array_key_exists("activate_access_Ter", $department) && $department["activate_access_Ter"] ? $department["activate_access_Ter"] : false;
+            $from_Ter = array_key_exists("from_Ter", $department) && $department["from_Ter"] ? $department["from_Ter"] : null;
+            $to_Ter = array_key_exists("to_Ter", $department) && $department["to_Ter"] ? $department["to_Ter"] : null;
+
+            $activate_access_Qua = array_key_exists("activate_access_Qua", $department) && $department["activate_access_Qua"] ? $department["activate_access_Qua"] : false;
+            $from_Qua = array_key_exists("from_Qua", $department) && $department["from_Qua"] ? $department["from_Qua"] : null;
+            $to_Qua = array_key_exists("to_Qua", $department) && $department["to_Qua"] ? $department["to_Qua"] : null;
+
+            $activate_access_Qui = array_key_exists("activate_access_Qui", $department) && $department["activate_access_Qui"] ? $department["activate_access_Qui"] : false;
+            $from_Qui = array_key_exists("from_Qui", $department) && $department["from_Qui"] ? $department["from_Qui"] : null;
+            $to_Qui = array_key_exists("to_Qui", $department) && $department["to_Qui"] ? $department["to_Qui"] : null;
+
+            $activate_access_Sex = array_key_exists("activate_access_Sex", $department) && $department["activate_access_Sex"] ? $department["activate_access_Sex"] : false;
+            $from_Sex = array_key_exists("from_Sex", $department) && $department["from_Sex"] ? $department["from_Sex"] : null;
+            $to_Sex = array_key_exists("to_Sex", $department) && $department["to_Sex"] ? $department["to_Sex"] : null;
+
+            $activate_access_Sab = array_key_exists("activate_access_Sab", $department) && $department["activate_access_Sab"] ? $department["activate_access_Sab"] : false;
+            $from_Sab = array_key_exists("from_Sab", $department) && $department["from_Sab"] ? $department["from_Sab"] : null;
+            $to_Sab = array_key_exists("to_Sab", $department) && $department["to_Sab"] ? $department["to_Sab"] : null;
+
+            $activate_access_Dom = array_key_exists("activate_access_Dom", $department) && $department["activate_access_Dom"] ? $department["activate_access_Dom"] : false;
+            $from_Dom = array_key_exists("from_Dom", $department) && $department["from_Dom"] ? $department["from_Dom"] : null;
+            $to_Dom = array_key_exists("to_Dom", $department) && $department["to_Dom"] ? $department["to_Dom"] : null;
+
+            $week_hours = [
+                1 => [ "from" => $from_Seg, "to" => $to_Seg, "active" => $activate_access_Seg],
+                2 => [ "from" => $from_Ter, "to" => $to_Ter, "active" => $activate_access_Ter],
+                3 => [ "from" => $from_Qua, "to" => $to_Qua, "active" => $activate_access_Qua],
+                4 => [ "from" => $from_Qui, "to" => $to_Qui, "active" => $activate_access_Qui],
+                5 => [ "from" => $from_Sex, "to" => $to_Sex, "active" => $activate_access_Sex],
+                6 => [ "from" => $from_Sab, "to" => $to_Sab, "active" => $activate_access_Sab],
+                7 => [ "from" => $from_Dom, "to" => $to_Dom, "active" => $activate_access_Dom],
+            ];
+        }
+
         $userRepository = new UserRepository($this->container);
         $companyRepository = new CompanyRepository($this->container);
 
@@ -461,7 +506,7 @@ final class Company
         $userId = $user->getId();
         $companyId = $user->getCompanyId();
 
-        return $response->withJson($companyRepository->updateDepartment($companyId, $userId, $department));
+        return $response->withJson($companyRepository->updateDepartment($companyId, $userId, $department, $activate_access, $week_hours));
     }
 
     public function deleteDepartment(Request $request, Response $response, array $args): Response
@@ -507,5 +552,54 @@ final class Company
         $companyId = $user->getCompanyId();
 
         return $response->withJson($companyRepository->saveCompanyTags($companyId, $userId, $groups));
+    }
+
+    public function deleteTagGroup(Request $request, Response $response, array $args): Response
+    {
+        $body = $request->getParsedBody();
+
+        $groupId = array_key_exists("groupId", $body) ? $body["groupId"] : 0;
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->deleteTagGroup($companyId, $userId, $groupId));
+    }
+
+    public function deleteTag(Request $request, Response $response, array $args): Response
+    {
+        $body = $request->getParsedBody();
+
+        $tagId = array_key_exists("tagId", $body) ? $body["tagId"] : 0;
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->deleteTag($companyId, $userId, $tagId));
+    }
+
+    public function getDepartmentAccessTime(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $departmentId = $route->getArgument('departmentId');
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->getDepartmentAccessTime($userId, $companyId, $departmentId));
     }
 }
