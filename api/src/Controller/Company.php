@@ -303,6 +303,7 @@ final class Company
         $displayName = array_key_exists("display_name", $body) && trim($body["display_name"]) !== "" ? $body["display_name"] : "";
 
         $activate_access = array_key_exists("activate_access", $body) && $body["activate_access"] ? $body["activate_access"] : false;
+        $grammar_correction = array_key_exists("grammar_correction", $body) && $body["grammar_correction"] ? $body["grammar_correction"] : false;
 
         $activate_access_Seg = array_key_exists("activate_access_Seg", $body) && $body["activate_access_Seg"] ? $body["activate_access_Seg"] : false;
         $from_Seg = array_key_exists("from_Seg", $body) && $body["from_Seg"] ? $body["from_Seg"] : null;
@@ -349,7 +350,7 @@ final class Company
         $userId = $user->getId();
         $companyId = $user->getCompanyId();
 
-        return $response->withJson($companyRepository->editUser($userId, $userRepository, $companyId, $editUserId, $departments, $displayName, $activate_access, $week_hours));
+        return $response->withJson($companyRepository->editUser($userId, $userRepository, $companyId, $editUserId, $departments, $displayName, $activate_access, $week_hours, $grammar_correction));
     }
 
     public function getEmployees(Request $request, Response $response, array $args): Response

@@ -923,8 +923,49 @@ final class ChatRepository
     return $message;
   }
 
+  private function grammarCorrect($text, $apiKeyGPT) {
+    $prompt = "Correct only grammar and accentuation in Brazilian Portuguese without changing words or adding any content. Keep the original words and style as much as possible. \n\nOriginal text: " . $text;
+
+    $postData = json_encode([
+      'messages' => [
+        [
+          'role' => 'system',
+          'content' => $prompt
+        ]
+      ],
+      'model' => 'gpt-3.5-turbo',
+    ]);
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, 'https://api.openai.com/v1/chat/completions'); // Endpoint correto para tradução
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Authorization: Bearer ' . $apiKeyGPT,
+    'Content-Type: application/json'
+    ]);
+
+    $response = curl_exec($ch);
+    curl_close($ch);
+    $responseData = json_decode($response, true);
+
+    // Verifica se há texto na resposta
+    if (isset($responseData['text'])) {
+      return $responseData['text'];
+    } else {
+      // Caso contrário, verifica se há opções de escolha com texto
+      if (isset($responseData['choices'][0]['message']['content'])) {
+        return $responseData['choices'][0]['message']['content'];
+      } else {
+        return $text;
+      }
+    }
+  }
+
   public function sendMessage($id, $userId, $companyId, $text, $scheduleDate, $message_type) {
-    $message = [ 'success' => false, "message" => 0 ];
+    $message = [ 'success' => false, "message" => 0, "text" => '' ];
 
     if ($companyId !== null) {
       $pdo = $this->container->get('db');
@@ -947,6 +988,14 @@ final class ChatRepository
       $phone = $lastChat['client_phone'];
 
       $stmt = $pdo->query("
+        SELECT *
+        FROM company_employee_configs 
+        WHERE company_employee_configs_employee_id = '$userId'
+      ");
+      $employee_configs = $stmt->fetch();
+      $grammar_correction = $employee_configs["grammar_correction"];
+
+      $stmt = $pdo->query("
         SELECT 
           device_login as instancia, 
           device_pass as token,
@@ -960,13 +1009,27 @@ final class ChatRepository
 
       if (trim($text) != "") {
         $security = new CryptContent($companyId);
-        $text = $security->encrypt($text);
+        
+        if ($grammar_correction == 1) {
+          $stmt = $pdo->query("
+            SELECT 
+              company_OpenIA_Key
+            FROM company_details WHERE company_id = '$companyId' 
+          ");
+          $companyDetails = $stmt->fetch();
+          $apiKeyGPT = $companyDetails["company_OpenIA_Key"];
+
+          if ($apiKeyGPT != 0)
+            $text = $this->grammarCorrect($text, $security->decrypt($apiKeyGPT));
+        }
+
+        $encryptText = $security->encrypt($text);
 
         $stmt = $pdo->prepare("
           INSERT INTO clients_messages (chat_id, message_id_external, client_id, client_phone, company_id, department_id, who_sent, message_status, message_status_time, message_created, message_type_detail, message_device_id, message_type, schedule_message) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$lastChat["chat_id"], '0', $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $text, $lastChat['device_id'], $message_type, ($scheduleDate != 0 ? time() : '0')]);
+        $stmt->execute([$lastChat["chat_id"], '0', $id, $lastChat['client_phone'], $companyId, $lastChat['chat_department_id'], $userId, 'SENT', $datetime, ($scheduleDate != 0 ? $scheduleDate : time()), $encryptText, $lastChat['device_id'], $message_type, ($scheduleDate != 0 ? time() : '0')]);
         $message["message"] = $scheduleDate == 0 && $status == 0 ? $pdo->lastInsertId() : 0;
       }
 
@@ -978,6 +1041,7 @@ final class ChatRepository
       ");
       $stmt->execute([$datetime, $lastChat["chat_id"]]);
 
+      $message['text'] = $text;
       $message["success"] = true;
     }
 

@@ -778,7 +778,8 @@ final class CompanyRepository
         IF(CAST('$userId' as UNSIGNED) = e.employee_id, 1, 0) as isMe, 
         (SELECT GROUP_CONCAT(employee_departments_departmentID) FROM employee_departments WHERE employee_departments_employeeID = e.employee_id AND employee_departments_finishDate = 0 AND employee_departments_finishBy = 0) as departments,
         ceg.company_employee_configs_employee_displayname as display_name,
-        ceg.company_employee_restrict_access as restrict_access
+        ceg.company_employee_restrict_access as restrict_access,
+        ceg.grammar_correction
       FROM employee_details e
       LEFT JOIN company_employee_configs ceg ON ceg.company_employee_configs_employee_id = e.employee_id AND ceg.company_employee_configs_company_id = '$companyId'
       WHERE e.employee_id IN (
@@ -804,7 +805,7 @@ final class CompanyRepository
     return $message;
   }
 
-  public function editUser($userId, $userRepository, $companyId, $editUserId, $departments, $display_name, $activate_access, $week_hours) {
+  public function editUser($userId, $userRepository, $companyId, $editUserId, $departments, $display_name, $activate_access, $week_hours, $grammar_correction) {
     $message = [ 'success' => false, 'error' => 'Erro na edição do usuário, tente mais tarde.', 'message' => '' ];
     
     if ($companyId !== null && $editUserId != 0 && count($departments) > 0) {
@@ -900,14 +901,15 @@ final class CompanyRepository
           }
         }
 
+        $grammar_correction = $grammar_correction ? 1 : 0;
         $restrict_access = $activate_access ? 1 : 0;
         if ($remove_restrict_access) $restrict_access = 0;
         $stmt = $pdo->prepare("
           INSERT INTO `company_employee_configs` 
-          (`company_employee_configs_company_id`, `company_employee_configs_employee_id`, `company_employee_configs_employee_displayname`, `company_employee_restrict_access`)
-          VALUES ('$companyId', '$editUserId', '$display_name', '$restrict_access')
+          (`company_employee_configs_company_id`, `company_employee_configs_employee_id`, `company_employee_configs_employee_displayname`, `company_employee_restrict_access`, `grammar_correction`)
+          VALUES ('$companyId', '$editUserId', '$display_name', '$restrict_access', '$grammar_correction')
           ON DUPLICATE KEY 
-          UPDATE `company_employee_restrict_access` = '$restrict_access', `company_employee_configs_employee_displayname` = '$display_name';
+          UPDATE `company_employee_restrict_access` = '$restrict_access', `company_employee_configs_employee_displayname` = '$display_name', `grammar_correction` = '$grammar_correction';
         ");
         $stmt->execute();
 
