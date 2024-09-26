@@ -63,6 +63,8 @@ final class Company
         $userRepository = new UserRepository($this->container);                                                                                
         $user = $userRepository->getUserByHeaders($request);
         $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+        $id = $id ? $id : $companyId;
 
         return $response->withJson($companyRepository->getCompanyData($userId, $id));
     }

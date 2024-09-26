@@ -6,6 +6,7 @@ use Pimple\Psr11\Container;
 use App\Lib\Chat;
 use App\Lib\Encrypt;
 use Slim\Psr7\UploadedFile;
+use App\Lib\CryptContent;
 
 final class CompanyRepository
 {
@@ -199,6 +200,7 @@ final class CompanyRepository
           c.company_mail as email,
           c.company_tel as phone,
           c.company_manager as manager,
+          c.company_OpenIA_Key as openAIKey,
           c.company_create as created_at
         FROM company_details c 
         INNER JOIN company_invitations ci ON ci.invitations_company_id = c.company_id
@@ -209,7 +211,9 @@ final class CompanyRepository
     ");
     $element = $stmt->fetch();
 
+    $security = new CryptContent($companyId);
     $element["id"] = Encrypt::encode($element["id"]);
+    $element["openAIKey"] = $security->decrypt($element['openAIKey']);
     $element["created_at"] = date("d/m/Y H:i:s", $element["created_at"]);
 
     $message = [ 'success' => true, 'company' => $element ];
