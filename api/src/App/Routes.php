@@ -92,6 +92,8 @@ $app->post('/company/delete-tag-group', 'App\Controller\Company:deleteTagGroup')
 $app->post('/company/delete-tag', 'App\Controller\Company:deleteTag')->add(Auth::class)->setName('deleteTag');
 $app->get('/company/department-access-time/{departmentId}', 'App\Controller\Company:getDepartmentAccessTime')->add(Auth::class)->setName('getDepartmentAccessTime');
 $app->post('/audio/transcript/{message_id}', 'App\Controller\Messages:transcript')->add(Auth::class)->setName('transcript');
+$app->get('/device/disconnect/{deviceId}', 'App\Controller\Company:disconnectDevice')->add(Auth::class)->setName('disconnectDevice');
+$app->post('/device/generate-qr-code/{deviceId}', 'App\Controller\Company:generateQRCode')->add(Auth::class)->setName('generateQRCode');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

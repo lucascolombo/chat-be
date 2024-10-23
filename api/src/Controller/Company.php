@@ -605,4 +605,42 @@ final class Company
 
         return $response->withJson($companyRepository->getDepartmentAccessTime($userId, $companyId, $departmentId));
     }
+
+    public function disconnectDevice(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $deviceId = $route->getArgument('deviceId');
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->disconnectDevice($userId, $companyId, $deviceId));
+    }
+
+    public function generateQRCode(Request $request, Response $response, array $args): Response
+    {
+        $routeContext = RouteContext::fromRequest($request);                                                                                                             
+        $route = $routeContext->getRoute();
+
+        $deviceId = $route->getArgument('deviceId');
+
+        $body = $request->getParsedBody();
+
+        $device_fila = array_key_exists("device_fila", $body) ? $body["device_fila"] : 0;
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->generateQRCode($userId, $companyId, $deviceId, $device_fila));
+    }
 }

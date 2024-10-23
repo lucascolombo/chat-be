@@ -8,6 +8,62 @@ use App\Lib\Encrypt;
 use Slim\Psr7\UploadedFile;
 use App\Lib\CryptContent;
 
+class DeviceConnection {
+  private $instancia;
+  private $token;
+
+  public function __construct($instancia, $token){
+    $this->instancia = $instancia;
+    $this->token = $token;
+  }
+
+  public function disconnect() {
+    $client = curl_init("https://api.z-api.io/instances/".$this->instancia."/token/".$this->token."/disconnect");
+
+    curl_setopt($client, CURLOPT_CUSTOMREQUEST, 'GET');
+    curl_setopt($client, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($client, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($client, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($client, CURLOPT_TIMEOUT, 3);
+    curl_setopt($client, CURLOPT_HTTPHEADER, array(
+    "client-token: F10e75314314549299f7236a6f2ac8c5fS",
+    "content-type: application/json"
+    ));
+
+    $response = curl_exec($client);
+
+    if (curl_error($client)) return null;
+    curl_close($client);
+
+    $data = json_decode($response);
+
+    return $data;
+  }
+
+  public function generateQRCode() {
+    $client = curl_init("https://api.z-api.io/instances/".$this->instancia."/token/".$this->token."/qr-code/image");
+
+    curl_setopt($client, CURLOPT_CUSTOMREQUEST, 'GET');
+    curl_setopt($client, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($client, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($client, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($client, CURLOPT_TIMEOUT, 20);
+    curl_setopt($client, CURLOPT_HTTPHEADER, array(
+    "client-token: F10e75314314549299f7236a6f2ac8c5fS",
+    "content-type: application/json"
+    ));
+
+    $response = curl_exec($client);
+
+    if (curl_error($client)) return curl_error($client);
+    curl_close($client);
+
+    $data = json_decode($response);
+
+    return $data->value;
+  }
+}
+
 final class CompanyRepository
 {
   private $container;
@@ -1221,7 +1277,7 @@ final class CompanyRepository
         $devices[] = [
           'value' => $single["device_id"], 
           'name' => $single["device_detail"], 
-          'status' => $single["device_status"]
+          'status' => $single["device_status"],
         ];
       }
 
@@ -1615,6 +1671,80 @@ final class CompanyRepository
       }
 
       $message = [ 'success' => true, 'access_time' => $arr ];
+    }
+
+    return $message;
+  }
+
+  public function disconnectDevice($userId, $companyId, $deviceId) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission) { 
+      $stmt = $pdo->query("
+        SELECT 
+          device_login as instancia, 
+          device_pass as token,
+          device_status as status
+        FROM company_devices WHERE device_id = '$deviceId' 
+      ");
+      $device = $stmt->fetch();
+      $instancia = $device["instancia"];
+      $token = $device["token"];
+
+      $deviceConnection = new DeviceConnection($instancia, $token);
+      $deviceConnection->disconnect();
+
+      $message = [ 'success' => true ];
+    }
+
+    return $message;
+  }
+
+  public function generateQRCode($userId, $companyId, $deviceId, $device_fila) {
+     $message = [ 'success' => false, 'resp' => '' ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission) { 
+      $stmt = $pdo->prepare("
+        UPDATE company_devices 
+        SET device_fila = ?
+        WHERE device_id = ?
+      ");
+      $stmt->execute([$device_fila, $deviceId]);
+
+      $stmt = $pdo->query("
+        SELECT 
+          device_login as instancia, 
+          device_pass as token,
+          device_status as status
+        FROM company_devices WHERE device_id = '$deviceId' 
+      ");
+      $device = $stmt->fetch();
+      $instancia = $device["instancia"];
+      $token = $device["token"];
+
+      $deviceConnection = new DeviceConnection($instancia, $token);
+
+      $message = [ 'success' => true, 'qrCode' => $deviceConnection->generateQRCode() ];
     }
 
     return $message;

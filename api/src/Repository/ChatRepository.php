@@ -336,10 +336,12 @@ final class ChatRepository
         ccs.status_label,
         ccs.status_date_validity,
         ccs.status_message_toEndChat,
-        ccs.status_abortIFmessageReceived
+        ccs.status_abortIFmessageReceived,
+        IFNULL(cd.departments_name, '') as departments_name
       FROM clients_chats_opened cco
       INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
       LEFT JOIN clients_chats_status ccs ON ccs.status_chat_id = cco.chat_id AND ccs.status_date_finished = 0
+      LEFT JOIN company_departments cd ON cd.departments_id = cco.chat_department_id
       WHERE cco.client_id = '$id'
       AND cco.company_id IN (
         SELECT invitations_company_id
@@ -1019,7 +1021,7 @@ final class ChatRepository
           $companyDetails = $stmt->fetch();
           $apiKeyGPT = $companyDetails["company_OpenIA_Key"];
 
-          if ($apiKeyGPT != 0)
+          if ($apiKeyGPT != 0 && $message_type == '0')
             $text = $this->grammarCorrect($text, $security->decrypt($apiKeyGPT));
         }
 
