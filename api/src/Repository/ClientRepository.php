@@ -60,6 +60,15 @@ final class ClientRepository
       ");
       $stmt->execute([$datetime, $id]);
 
+      if ($lastChat['chat_employee_id'] == 0) {
+        $stmt = $pdo->prepare("
+          UPDATE clients_chats_opened as cco
+          SET cco.chat_employee_id = ?
+          WHERE cco.chat_id = ?
+        ");
+        $stmt->execute([$userId, $lastChat['chat_id']]);
+      }
+
       $messageTypeDetail = "Atendimento Finalizado por $usuario";
       $security = new CryptContent($companyId);
       $messageTypeDetail = $security->encrypt($messageTypeDetail);
@@ -121,7 +130,7 @@ final class ClientRepository
         INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who, ura_status) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ");
-      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $lastChat['chat_department_id'], $userId, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who'], '1']);
+      $stmt->execute(['1', $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $lastChat['chat_department_id'], $userId, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who'], '1']);
 
       $newChatId = $pdo->lastInsertId();
 

@@ -1749,4 +1749,203 @@ final class CompanyRepository
 
     return $message;
   }
+
+  private function generalData($userId, $companyId, $filters) {
+    // filters $filters
+    $dataStart = 0;  // Substitua pelo valor de data de início (em Unix)
+    $dataEnd = time();  // Substitua pelo valor de data final (em Unix)
+    $user = 0;  // Substitua pelo ID do usuário ou 0
+
+    $sql = "
+    SELECT 
+        COUNT(DISTINCT CASE WHEN c.company_id = :companyID AND c.who_start = 0 
+                   AND c.chat_date_start >= :dataStart AND c.chat_date_start <= :dataEnd 
+                   AND c.chat_date_close <= 0 
+                   AND ((:user > 0 AND c.chat_employee_id = :user) OR (:user <= 0 AND c.chat_employee_id >= 0)) 
+                   THEN c.chat_id END) AS NewClientChats_Active,
+                   
+        COUNT(DISTINCT CASE WHEN c.company_id = :companyID AND c.who_start = 0 
+                   AND c.chat_date_start >= :dataStart AND c.chat_date_start <= :dataEnd 
+                   AND c.chat_date_close > 0 
+                   AND ((:user > 0 AND c.chat_employee_id = :user) OR (:user <= 0 AND c.chat_employee_id >= 0)) 
+                   THEN c.chat_id END) AS NewClientChats_Closed,
+                   
+        COUNT(DISTINCT CASE WHEN c.company_id = :companyID AND who_start > 0
+                   AND ((:user > 0 AND c.chat_employee_id = :user) OR (:user <= 0 AND c.chat_employee_id >= 0)) 
+                   AND c.chat_date_start >= :dataStart AND c.chat_date_start <= :dataEnd 
+                   AND c.chat_date_close <= 0 
+                   THEN c.chat_id END) AS NewCompanyChats_Active,
+                   
+        COUNT(DISTINCT CASE WHEN c.company_id = :companyID AND who_start > 0
+                   AND ((:user > 0 AND c.chat_employee_id = :user) OR (:user <= 0 AND c.chat_employee_id >= 0)) 
+                   AND c.chat_date_start >= :dataStart AND c.chat_date_start <= :dataEnd 
+                   AND c.chat_date_close > 0 
+                   THEN c.chat_id END) AS NewCompanyChats_Closed,
+                   
+        COUNT(DISTINCT CASE WHEN m.company_id = :companyID AND m.message_created >= :dataStart 
+                   AND m.message_created <= :dataEnd 
+                   AND ((:user > 0 AND m.who_sent = :user) OR (:user <= 0 AND m.who_sent >= 0))
+                   THEN m.message_id END) AS SentMessages,
+        COUNT(DISTINCT CASE 
+                    WHEN m.company_id = :companyID 
+                    AND m.message_created >= :dataStart 
+                    AND m.message_created <= :dataEnd 
+                    AND m.who_sent <= 0 
+                    AND EXISTS (
+                        SELECT 1 
+                        FROM clients_chats_opened c 
+                        WHERE c.chat_id = m.chat_id 
+                        AND c.company_id = :companyID
+                        AND ((:user > 0 AND c.chat_employee_id = :user) OR (:user <= 0 AND c.chat_employee_id >= 0))
+                    )
+                    THEN m.message_id 
+                END) AS ReceivedMessages
+    FROM 
+        clients_chats_opened c
+    LEFT JOIN 
+        clients_messages m ON c.company_id = m.company_id AND c.chat_id = m.chat_id
+    WHERE 
+        c.company_id = :companyID
+    ";
+
+    $pdo = $this->container->get('db');
+    // Preparar e executar a consulta
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':dataStart', $dataStart);
+    $stmt->bindParam(':dataEnd', $dataEnd);
+    $stmt->bindParam(':user', $user);
+    $stmt->bindParam(':companyID', $companyId);
+    $stmt->execute();
+
+    // Obter o resultado
+    $result = $stmt->fetch();
+
+    // Calcular os totais
+    $result['NewActiveChats_Total'] = $result['NewClientChats_Active'] + $result['NewCompanyChats_Active'];
+    $result['NewClosedChats_Total'] = $result['NewClientChats_Closed'] + $result['NewCompanyChats_Closed'];
+    $result['AllNewChats_Total'] = $result['NewActiveChats_Total'] + $result['NewClosedChats_Total'];
+
+    return [ 'success' => true, 'chart' => [ 'data' => $result ] ];
+  }
+
+  private function getChatsActiveVsInactive($userId, $companyId, $filters) {
+    // filters $filters
+    $dataStart = time() - 60 * 60 * 24 * 30 * 3;  // Substitua pelo valor de data de início (em Unix)
+    $dataEnd = time();  // Substitua pelo valor de data final (em Unix)
+    $user = 0;  // Substitua pelo ID do usuário ou 0
+
+    $sql = "
+    SELECT 
+        DATE_FORMAT(FROM_UNIXTIME(c.chat_date_start), '%m') AS month,
+
+        COUNT(DISTINCT CASE WHEN c.company_id = :companyID AND c.who_start = 0 
+                   AND c.chat_date_start >= :dataStart AND c.chat_date_start <= :dataEnd 
+                   AND c.chat_date_close <= 0 
+                   AND ((:user > 0 AND c.chat_employee_id = :user) OR (:user <= 0 AND c.chat_employee_id >= 0)) 
+                   THEN c.chat_id END) AS NewClientChats_Active,
+                   
+        COUNT(DISTINCT CASE WHEN c.company_id = :companyID AND c.who_start = 0 
+                   AND c.chat_date_start >= :dataStart AND c.chat_date_start <= :dataEnd 
+                   AND c.chat_date_close > 0 
+                   AND ((:user > 0 AND c.chat_employee_id = :user) OR (:user <= 0 AND c.chat_employee_id >= 0)) 
+                   THEN c.chat_id END) AS NewClientChats_Closed,
+                   
+        COUNT(DISTINCT CASE WHEN c.company_id = :companyID AND who_start > 0
+                   AND ((:user > 0 AND c.chat_employee_id = :user) OR (:user <= 0 AND c.chat_employee_id >= 0)) 
+                   AND c.chat_date_start >= :dataStart AND c.chat_date_start <= :dataEnd 
+                   AND c.chat_date_close <= 0 
+                   THEN c.chat_id END) AS NewCompanyChats_Active,
+                   
+        COUNT(DISTINCT CASE WHEN c.company_id = :companyID AND who_start > 0
+                   AND ((:user > 0 AND c.chat_employee_id = :user) OR (:user <= 0 AND c.chat_employee_id >= 0)) 
+                   AND c.chat_date_start >= :dataStart AND c.chat_date_start <= :dataEnd 
+                   AND c.chat_date_close > 0 
+                   THEN c.chat_id END) AS NewCompanyChats_Closed
+    FROM 
+        clients_chats_opened c
+    LEFT JOIN 
+        clients_messages m ON c.company_id = m.company_id AND c.chat_id = m.chat_id
+    WHERE 
+        c.company_id = :companyID
+    AND c.chat_date_start >= :dataStart AND c.chat_date_start <= :dataEnd 
+    GROUP BY DATE_FORMAT(FROM_UNIXTIME(c.chat_date_start), '%m')
+    ORDER BY DATE_FORMAT(FROM_UNIXTIME(c.chat_date_start), '%m')
+    ";
+
+    $pdo = $this->container->get('db');
+    // Preparar e executar a consulta
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':dataStart', $dataStart);
+    $stmt->bindParam(':dataEnd', $dataEnd);
+    $stmt->bindParam(':user', $user);
+    $stmt->bindParam(':companyID', $companyId);
+    $stmt->execute();
+
+    // Obter o resultado
+    $result = $stmt->fetchAll();
+
+    return [ 'success' => true, 'chart' => [ 'data' => $result ] ];
+  }
+
+  private function getMessagesHeatMap($userId, $companyId, $filters) {
+    // filters $filters
+    $dataStart = 0;  // Substitua pelo valor de data de início (em Unix)
+    $dataEnd = time();  // Substitua pelo valor de data final (em Unix)
+    $user = 0;  // Substitua pelo ID do usuário ou 0
+
+    $sql = "
+      SELECT
+    DATE_FORMAT(FROM_UNIXTIME(m.message_created), '%w') AS weekDay, -- Dia da semana (0 = domingo)
+    DATE_FORMAT(FROM_UNIXTIME(m.message_created), '%H') AS hourDay, -- Hora do dia
+    COUNT(
+        DISTINCT CASE
+            WHEN m.company_id = :companyID 
+                 AND m.message_created BETWEEN :dataStart AND :dataEnd
+                 AND m.who_sent = 0
+            THEN m.message_id
+        END
+    ) AS countAllMessages
+FROM 
+    clients_messages m
+WHERE 
+    m.company_id = :companyID
+    AND m.message_created BETWEEN :dataStart AND :dataEnd
+GROUP BY 
+    weekDay, hourDay
+ORDER BY 
+    weekDay, hourDay
+    ";
+
+    $pdo = $this->container->get('db');
+    // Preparar e executar a consulta
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':dataStart', $dataStart);
+    $stmt->bindParam(':dataEnd', $dataEnd);
+    $stmt->bindParam(':user', $user);
+    $stmt->bindParam(':companyID', $companyId);
+    $stmt->execute();
+
+    // Obter o resultado
+    $result = $stmt->fetchAll();
+
+    return [ 'success' => true, 'chart' => [ 'data' => $result ] ];
+  }
+
+  public function getGraphs($userId, $companyId, $type, $filters) {
+    $message = [ 'success' => false, 'chart' => null ];
+
+    switch ($type) {
+      case 'chatsActiveVsInactive':
+        $message = $this->getChatsActiveVsInactive($userId, $companyId, $filters);
+        break;
+      case 'generalData':
+        $message = $this->generalData($userId, $companyId, $filters);
+        break;
+      case 'messagesHeatMap':
+        $message = $this->getMessagesHeatMap($userId, $companyId, $filters);
+        break;
+    }
+
+    return $message;
+  }
 }

@@ -643,4 +643,21 @@ final class Company
 
         return $response->withJson($companyRepository->generateQRCode($userId, $companyId, $deviceId, $device_fila));
     }
+
+    public function getGraphs(Request $request, Response $response, array $args): Response
+    {
+        $body = $request->getParsedBody();
+
+        $type = array_key_exists("type", $body) ? $body["type"] : "";
+        $filters = array_key_exists("filters", $body) ? $body["filters"] : [];
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->getGraphs($userId, $companyId, $type, $filters));
+    }
 }

@@ -94,6 +94,7 @@ $app->get('/company/department-access-time/{departmentId}', 'App\Controller\Comp
 $app->post('/audio/transcript/{message_id}', 'App\Controller\Messages:transcript')->add(Auth::class)->setName('transcript');
 $app->get('/device/disconnect/{deviceId}', 'App\Controller\Company:disconnectDevice')->add(Auth::class)->setName('disconnectDevice');
 $app->post('/device/generate-qr-code/{deviceId}', 'App\Controller\Company:generateQRCode')->add(Auth::class)->setName('generateQRCode');
+$app->post('/company/graphs', 'App\Controller\Company:getGraphs')->add(Auth::class)->setName('getGraphs');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

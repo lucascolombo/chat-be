@@ -888,11 +888,13 @@ final class ChatRepository
     else {
       $stmt = $pdo->query("
         SELECT 
-          employee_displayname
-        FROM employee_details WHERE employee_id = '$userId' 
+          company_employee_configs_employee_displayname as display_name
+        FROM company_employee_configs 
+        WHERE company_employee_configs_employee_id = '$userId'
+        AND company_employee_configs_company_id = '$companyId'
       ");
       $employee = $stmt->fetch();
-      $display_name = trim($employee["employee_displayname"]);
+      $display_name = trim($employee["display_name"]);
       if ($display_name !== "") {
         $text = "*" . $display_name . "*:" . "
 " . $text;
