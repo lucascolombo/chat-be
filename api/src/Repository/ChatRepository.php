@@ -258,7 +258,8 @@ final class ChatRepository
       (SELECT IFNULL(e.employee_name, 0) FROM clients_messages cm LEFT JOIN employee_details e ON e.employee_id = cm.who_sent WHERE cm.chat_id = cco.chat_id AND cm.message_deleted_date = 0 AND cm.message_created <= UNIX_TIMESTAMP() ORDER BY cm.message_id DESC LIMIT 1) as last_message_user,
       cco.chat_standby,
       crd.department_fixed,
-      crd.employee_fixed
+      crd.employee_fixed,
+      cco.isGroup
     FROM clients_chats_opened cco
     INNER JOIN clients_registered_details crd ON crd.client_id = cco.client_id
     LEFT JOIN clients_chats_status ccs ON ccs.status_chat_id = cco.chat_id AND ccs.status_date_finished = 0
@@ -394,7 +395,9 @@ final class ChatRepository
         cm.sent_from,
         cm.sendError,
         cd.device_status,
-        cm.cron_transcript
+        cm.cron_transcript,
+        cm.senderName,
+        cco.isGroup
       FROM clients_messages cm
       INNER JOIN clients_chats_opened cco ON cco.chat_id = cm.chat_id
       INNER JOIN company_devices cd ON cd.device_id = cco.device_id
@@ -662,10 +665,10 @@ final class ChatRepository
       $stmt->execute([$datetime, $id]);
 
       $stmt = $pdo->prepare("
-        INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who, ura_status) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who, ura_status, isGroup) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ");
-      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $setor, $userId, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who'], '1']);
+      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $setor, $userId, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who'], '1', $lastChat['isGroup']]);
 
       $newChatId = $pdo->lastInsertId();
 
@@ -733,10 +736,10 @@ final class ChatRepository
       $stmt->execute([$datetime, $id]);
 
       $stmt = $pdo->prepare("
-        INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO clients_chats_opened (who_start, client_id, company_id, device_id, client_phone, chat_date_start, chat_department_id, chat_employee_id, chat_employee_last_seen, chat_last_message_add, chat_last_message_who, isGroup) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ");
-      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $lastChat['chat_department_id'], $user, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who']]);
+      $stmt->execute([$lastChat['who_start'], $id, $companyId, $lastChat['device_id'], $lastChat['client_phone'], $datetime, $lastChat['chat_department_id'], $user, $datetime, $lastChat['chat_last_message_add'], $lastChat['chat_last_message_who'], $lastChat['isGroup']]);
 
       $newChatId = $pdo->lastInsertId();
 
@@ -869,8 +872,10 @@ final class ChatRepository
       LIMIT 1
     ");
     $lastChat = $stmt->fetch();
+    $isGroup = $lastChat['isGroup'] == 1 ? true : false;
     $device_id = $lastChat["device_id"];
     $phone = $lastChat['client_phone'];
+    $phone = $isGroup ? $phone . '-group' : $phone;
 
     $stmt = $pdo->query("
       SELECT 

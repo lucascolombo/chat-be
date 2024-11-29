@@ -1931,6 +1931,65 @@ ORDER BY
     return [ 'success' => true, 'chart' => [ 'data' => $result ] ];
   }
 
+  private function getChatDurationAverageTime($userId, $companyId, $filters) {
+    // filters $filters
+    $dataStart = time() - 60 * 60 * 24 * 30 * 3;  // Substitua pelo valor de data de início (em Unix)
+    $dataEnd = time();  // Substitua pelo valor de data final (em Unix)
+    $user = 0;  // Substitua pelo ID do usuário ou 0
+
+    $sql = "SELECT 
+              COUNT(*) AS total_chats,
+              SEC_TO_TIME(AVG(chat_date_close - chat_date_start)) AS avg_time_formatted, -- Tempo médio formatado
+              CASE 
+                  WHEN (chat_date_close - chat_date_start) <= 3600 THEN '1 hora' 
+                  WHEN (chat_date_close - chat_date_start) <= 43200 THEN '12 horas' 
+                  WHEN (chat_date_close - chat_date_start) <= 86400 THEN '24 horas' 
+                  WHEN (chat_date_close - chat_date_start) <= 259200 THEN '3 dias' 
+                  WHEN (chat_date_close - chat_date_start) <= 604800 THEN '7 dias' 
+                  WHEN (chat_date_close - chat_date_start) <= 1296000 THEN '15 dias' 
+                  WHEN (chat_date_close - chat_date_start) <= 2592000 THEN '30 dias' 
+                  ELSE '30+ dias'
+              END AS time_range
+          FROM 
+              clients_chats_opened
+          WHERE 
+              chat_date_close > 0
+              AND chat_date_start > 0
+              AND (chat_department_id >= 0) -- Substitua 1 pelo ID do departamento ou remova o filtro
+              AND (chat_employee_id >= 0)   -- Substitua 2 pelo ID do funcionário ou remova o filtro
+              -- AND chat_date_start >= FILTRO INTERVALO
+              -- AND chat_date_start <= FILTRO INTERVALO
+          GROUP BY 
+              time_range
+          HAVING 
+              time_range IS NOT NULL
+          ORDER BY 
+              avg_time_formatted
+    ";
+
+    $pdo = $this->container->get('db');
+    // Preparar e executar a consulta
+    $stmt = $pdo->prepare($sql);
+    // $stmt->bindParam(':dataStart', $dataStart);
+    // $stmt->bindParam(':dataEnd', $dataEnd);
+    // $stmt->bindParam(':user', $user);
+    // $stmt->bindParam(':companyID', $companyId);
+    $stmt->execute();
+
+    // Obter o resultado
+    $result = $stmt->fetchAll();
+    $data = [];
+
+    foreach ($result as $row) {
+      $data[] = [
+        'value' => $row['total_chats'],
+        'label' => $row['time_range'],
+      ];
+    }
+
+    return [ 'success' => true, 'chart' => [ 'data' => $data ] ];
+  }
+
   public function getGraphs($userId, $companyId, $type, $filters) {
     $message = [ 'success' => false, 'chart' => null ];
 
@@ -1943,6 +2002,9 @@ ORDER BY
         break;
       case 'messagesHeatMap':
         $message = $this->getMessagesHeatMap($userId, $companyId, $filters);
+        break;
+      case 'chatDurationAverageTime':
+        $message = $this->getChatDurationAverageTime($userId, $companyId, $filters);
         break;
     }
 
