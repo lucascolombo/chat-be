@@ -95,6 +95,7 @@ $app->post('/audio/transcript/{message_id}', 'App\Controller\Messages:transcript
 $app->get('/device/disconnect/{deviceId}', 'App\Controller\Company:disconnectDevice')->add(Auth::class)->setName('disconnectDevice');
 $app->post('/device/generate-qr-code/{deviceId}', 'App\Controller\Company:generateQRCode')->add(Auth::class)->setName('generateQRCode');
 $app->post('/company/graphs', 'App\Controller\Company:getGraphs')->add(Auth::class)->setName('getGraphs');
+$app->post('/company/ignore-chat', 'App\Controller\Company:ignoreChat')->add(Auth::class)->setName('ignoreChat');
 
 $app->setBasePath($path);
 $app->addRoutingMiddleware();

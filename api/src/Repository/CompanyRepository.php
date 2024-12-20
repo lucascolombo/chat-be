@@ -1711,7 +1711,7 @@ final class CompanyRepository
   }
 
   public function generateQRCode($userId, $companyId, $deviceId, $device_fila) {
-     $message = [ 'success' => false, 'resp' => '' ];
+    $message = [ 'success' => false, 'resp' => '' ];
 
     $pdo = $this->container->get('db');
     $stmt = $pdo->query("
@@ -1745,6 +1745,31 @@ final class CompanyRepository
       $deviceConnection = new DeviceConnection($instancia, $token);
 
       $message = [ 'success' => true, 'qrCode' => $deviceConnection->generateQRCode() ];
+    }
+
+    return $message;
+  }
+
+  public function ignoreChat($userId, $companyId, $chat_id, $ignore) {
+    $message = [ 'success' => false ];
+
+    $pdo = $this->container->get('db');
+    $stmt = $pdo->query("
+      SELECT * FROM company_invitations 
+      WHERE invitations_company_id = '$companyId'
+      AND invitations_employee_id = '$userId'
+      AND invitations_accept > 0 
+      AND invitations_finish = 0
+    ");
+    $permission = $stmt->fetch();
+
+    if ($permission) {
+       $stmt = $pdo->prepare("
+        UPDATE clients_chats_opened 
+        SET ignore_on_charts = ?
+        WHERE chat_id = ?
+      ");
+      $stmt->execute([$ignore, $chat_id]);
     }
 
     return $message;
@@ -1895,25 +1920,25 @@ final class CompanyRepository
 
     $sql = "
       SELECT
-    DATE_FORMAT(FROM_UNIXTIME(m.message_created), '%w') AS weekDay, -- Dia da semana (0 = domingo)
-    DATE_FORMAT(FROM_UNIXTIME(m.message_created), '%H') AS hourDay, -- Hora do dia
-    COUNT(
-        DISTINCT CASE
-            WHEN m.company_id = :companyID 
-                 AND m.message_created BETWEEN :dataStart AND :dataEnd
-                 AND m.who_sent = 0
-            THEN m.message_id
-        END
-    ) AS countAllMessages
-FROM 
-    clients_messages m
-WHERE 
-    m.company_id = :companyID
-    AND m.message_created BETWEEN :dataStart AND :dataEnd
-GROUP BY 
-    weekDay, hourDay
-ORDER BY 
-    weekDay, hourDay
+          DATE_FORMAT(FROM_UNIXTIME(m.message_created), '%w') AS weekDay, -- Dia da semana (0 = domingo)
+          DATE_FORMAT(FROM_UNIXTIME(m.message_created), '%H') AS hourDay, -- Hora do dia
+          COUNT(
+              DISTINCT CASE
+                  WHEN m.company_id = :companyID 
+                      AND m.message_created BETWEEN :dataStart AND :dataEnd
+                      AND m.who_sent = 0
+                  THEN m.message_id
+              END
+          ) AS countAllMessages
+      FROM 
+          clients_messages m
+      WHERE 
+          m.company_id = :companyID
+          AND m.message_created BETWEEN :dataStart AND :dataEnd
+      GROUP BY 
+          weekDay, hourDay
+      ORDER BY 
+          weekDay, hourDay
     ";
 
     $pdo = $this->container->get('db');
@@ -1990,6 +2015,117 @@ ORDER BY
     return [ 'success' => true, 'chart' => [ 'data' => $data ] ];
   }
 
+  private function getClientsWithoutAnswer($userId, $companyId, $filters) {
+    // filters $filters
+    $dataStart = time() - 60 * 60 * 24 * 30 * 3;  // Substitua pelo valor de data de início (em Unix)
+    $dataEnd = time();  // Substitua pelo valor de data final (em Unix)
+    $user = 0;  // Substitua pelo ID do usuário ou 0
+
+    /*
+        SELECT message_created
+        FROM clients_messages 
+        WHERE schedule_message = 0
+        AND schedule_DeletedBy = 0
+        AND schedule_SentEarly = 0
+        AND sendError = 0
+        AND message_deleted_date = 0
+        AND system_log = 0
+        AND company_id = 12
+        AND chat_id = 702
+        AND sent_from = 'M'
+        ORDER BY message_created DESC
+        LIMIT 1
+    */
+
+    $sql = "SELECT 
+        c.client_id as id, 
+        c.chat_id,
+        c.ignore_on_charts,
+        c.client_phone, 
+        crd.client_name,
+        c.chat_date_close,
+        c.chat_date_start,
+        c.chat_employee_id,
+        DATEDIFF(NOW(), FROM_UNIXTIME(subquery.message_created)) as days_diff,
+        subquery.message_created as last_message_add, 
+        subquery.message_type_detail as last_message,
+        ccs.status_type,
+        ccs.status_label,
+        ccs.status_date_validity,
+        UNIX_TIMESTAMP(c.created_at) as created_at 
+      FROM clients_chats_opened c
+        INNER JOIN clients_registered_details crd ON crd.client_id = c.client_id AND crd.company_id = c.company_id
+        LEFT JOIN clients_chats_status ccs ON ccs.status_chat_id = c.chat_id AND ccs.status_date_finished = 0
+        INNER JOIN 
+          (SELECT 
+            m.client_id,
+            m.message_type_detail,
+            m.message_created,
+            sent_from, 
+            schedule_message, 
+            schedule_DeletedBy, 
+            schedule_SentEarly
+          FROM clients_messages m
+          INNER JOIN (
+            SELECT 
+              client_id, 
+              MAX(message_created) AS message_created
+            FROM clients_messages
+            WHERE company_id = :companyID
+            AND system_log = 0
+            GROUP BY client_id
+            ) sbq ON m.client_id = sbq.client_id AND m.message_created = sbq.message_created
+          ) subquery ON c.client_id = subquery.client_id
+      WHERE c.chat_date_close < c.chat_date_start
+      -- AND c.chat_employee_id = FILTRO $user
+      -- AND c.chat_date_start >= FILTRO INTERVALO
+      -- AND c.chat_date_start <= FILTRO INTERVALO
+      AND c.chat_date_close = 0
+      AND UPPER(subquery.sent_from) = 'C'
+      AND subquery.message_created < UNIX_TIMESTAMP(NOW() - INTERVAL 2 DAY)
+      AND c.company_id = :companyID
+      AND subquery.schedule_message = 0
+      AND subquery.schedule_DeletedBy = 0
+      AND subquery.schedule_SentEarly = 0
+      AND c.chat_id NOT IN (
+        SELECT s.status_chat_id FROM clients_chats_status s
+        WHERE s.status_date_validity > 0
+        AND s.status_type = 3
+        AND s.status_abortIFmessageReceived = 1
+        AND s.status_company_id = c.company_id
+      )
+      GROUP BY c.client_id
+      ORDER BY subquery.message_created ASC";
+
+    $pdo = $this->container->get('db');
+    // Preparar e executar a consulta
+    $stmt = $pdo->prepare($sql);
+    // $stmt->bindParam(':dataStart', $dataStart);
+    // $stmt->bindParam(':dataEnd', $dataEnd);
+    // $stmt->bindParam(':user', $user);
+    $stmt->bindParam(':companyID', $companyId);
+    $stmt->execute();
+
+    // Obter o resultado
+    $result = $stmt->fetchAll();
+    $data = [];
+
+    $security = new CryptContent($companyId);
+
+    foreach ($result as $row) {
+      $element = $row;
+      
+      $decrypt = $security->decrypt($element['last_message']);
+
+      $element['last_message'] = !$decrypt ? $element['last_message'] : $decrypt;
+      $element["last_message_add"] = date("d/m/Y H:i", $element["last_message_add"]);
+      $element["created_at"] = date("d/m/Y H:i", $element["created_at"]);
+      $data[] = $element;
+    }
+
+    return [ 'success' => true, 'chart' => [ 'data' => $data ] ];
+  }
+
   public function getGraphs($userId, $companyId, $type, $filters) {
     $message = [ 'success' => false, 'chart' => null ];
 
@@ -2005,6 +2141,9 @@ ORDER BY
         break;
       case 'chatDurationAverageTime':
         $message = $this->getChatDurationAverageTime($userId, $companyId, $filters);
+        break;
+      case 'clientsWithoutAnswer':
+        $message = $this->getClientsWithoutAnswer($userId, $companyId, $filters);
         break;
     }
 

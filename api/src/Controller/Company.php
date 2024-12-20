@@ -660,4 +660,21 @@ final class Company
 
         return $response->withJson($companyRepository->getGraphs($userId, $companyId, $type, $filters));
     }
+
+    public function ignoreChat(Request $request, Response $response, array $args): Response
+    {
+        $body = $request->getParsedBody();
+
+        $chat_id = array_key_exists("chat_id", $body) ? $body["chat_id"] : 0;
+        $ignore = array_key_exists("ignore", $body) ? $body["ignore"] : 0;
+
+        $userRepository = new UserRepository($this->container);
+        $companyRepository = new CompanyRepository($this->container);
+
+        $user = $userRepository->getUserByHeaders($request);
+        $userId = $user->getId();
+        $companyId = $user->getCompanyId();
+
+        return $response->withJson($companyRepository->ignoreChat($userId, $companyId, $chat_id, $ignore));
+    }
 }
